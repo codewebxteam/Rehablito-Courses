@@ -1,6 +1,6 @@
 import { createOrder } from "../firebase/orders.service";
 
-export const RAZORPAY_KEY_ID = "rzp_test_TX7SGbS6xXovyE";
+export const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
 // Dynamically load Razorpay SDK if not present
 export const loadRazorpayScript = () => {

@@ -245,7 +245,7 @@ const PricingCard = ({ course, isEnrolled }) => {
                 {displayPrice === "Free Access" ? "Enroll for Free" : "Enroll Now"}
               </button>
 
-              {displayPrice !== "Free Access" && (
+              {/* {displayPrice !== "Free Access" && (
                 <button
                   onClick={handleNotifyAdmin}
                   disabled={notifyLoading}
@@ -258,7 +258,7 @@ const PricingCard = ({ course, isEnrolled }) => {
                   )}
                   {notifyLoading ? "Sending Request..." : "I have already paid"}
                 </button>
-              )}
+              )} */}
             </>
           )}
 
