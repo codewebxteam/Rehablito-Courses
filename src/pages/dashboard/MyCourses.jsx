@@ -9,6 +9,8 @@ import {
   FileVideo,
   ChevronRight,
   List,
+  Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import CourseCard from "../../components/dashboard/CourseCard";
@@ -18,12 +20,17 @@ import { useCourse } from "../../context/CourseContext";
 const MyCourses = () => {
   const { enrolledCourses } = useCourse();
   const [filterStatus, setFilterStatus] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // State for Playlist & Player
-  const [selectedCourse, setSelectedCourse] = useState(null); // Playlist Modal ke liye
-  const [playingVideoIndex, setPlayingVideoIndex] = useState(null); // Player ke liye
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [playingVideoIndex, setPlayingVideoIndex] = useState(null);
 
   const filteredCourses = enrolledCourses.filter((course) => {
+    const matchesSearch = course.title
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
     if (filterStatus === "all") return true;
     if (filterStatus === "in-progress") return course.status === "in-progress";
     if (filterStatus === "completed") return course.status === "completed";
@@ -33,16 +40,10 @@ const MyCourses = () => {
   const inProgressCount = enrolledCourses.filter(
     (c) => c.status === "in-progress"
   ).length;
-  const completedCount = enrolledCourses.filter(
-    (c) => c.status === "completed"
-  ).length;
 
-  // --- [FIXED] DATA EXTRACTOR ---
-  // Ye function check karega ki course me 'lectures' array hai ya nahi
   const getLecturesList = (course) => {
     if (!course) return [];
 
-    // 1. Agar DB me lectures array hai (3 Videos wala case)
     if (
       course.lectures &&
       Array.isArray(course.lectures) &&
@@ -51,7 +52,6 @@ const MyCourses = () => {
       return course.lectures;
     }
 
-    // 2. Agar purana single video hai
     if (course.videoId) {
       return [
         {
@@ -66,83 +66,85 @@ const MyCourses = () => {
     return [];
   };
 
-  // Click on Course Card -> Open Playlist Modal
   const handleOpenCourse = (course) => {
     setSelectedCourse(course);
     setPlayingVideoIndex(null);
   };
 
-  // Click on Video inside List -> Open Player
   const handlePlayVideo = (index) => {
     setPlayingVideoIndex(index);
   };
 
-  // Close everything
   const handleCloseAll = () => {
     setSelectedCourse(null);
     setPlayingVideoIndex(null);
   };
 
-  // Safe Image Function
   const getThumbnail = (vidId) => {
     return vidId
       ? `https://img.youtube.com/vi/${vidId}/mqdefault.jpg`
       : "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&q=80";
   };
 
-  // Get current active list
   const currentLectures = getLecturesList(selectedCourse);
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 pb-12 font-sans text-[#0F1B3D]">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-md">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">My Learning</h1>
-          <p className="text-slate-500 mt-1">
-            Manage your courses and track progress.
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FCE7F3] text-[#E6007E] text-xs font-extrabold mb-2">
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>My Learning Portal</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F1B3D]">
+            My <span className="text-[#E6007E]">Learning</span>
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            Manage your enrolled therapy courses and track progress.
           </p>
         </div>
+
+        {/* Search Input */}
         <div className="flex gap-3">
           <div className="relative group">
-            <Search className="absolute left-3 top-3 size-4 text-slate-400 group-focus-within:text-[#5edff4]" />
+            <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400 group-focus-within:text-[#0F1B3D]" />
             <input
               type="text"
-              placeholder="Search..."
-              className="bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-sm focus:border-[#5edff4] outline-none w-full sm:w-64"
+              placeholder="Search your courses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-slate-50 border border-slate-200 pl-10 pr-4 py-3 rounded-2xl text-xs font-semibold focus:border-[#0F1B3D] outline-none w-full sm:w-64"
             />
           </div>
-          <button className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600">
-            <Filter className="size-5" />
-          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-6 border-b border-slate-200">
+      {/* Filter Tabs */}
+      <div className="flex gap-4 border-b border-slate-200 pb-1">
         <button
           onClick={() => setFilterStatus("all")}
-          className={`pb-3 text-sm font-bold ${
+          className={`pb-3 text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
             filterStatus === "all"
-              ? "text-[#0891b2] border-b-2 border-[#0891b2]"
-              : "text-slate-500"
+              ? "text-[#E6007E] border-b-2 border-[#E6007E]"
+              : "text-slate-500 hover:text-[#0F1B3D]"
           }`}
         >
-          All Courses ({enrolledCourses.length})
+          All Enrolled ({enrolledCourses.length})
         </button>
         <button
           onClick={() => setFilterStatus("in-progress")}
-          className={`pb-3 text-sm font-bold ${
+          className={`pb-3 text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
             filterStatus === "in-progress"
-              ? "text-[#0891b2] border-b-2 border-[#0891b2]"
-              : "text-slate-500"
+              ? "text-[#16A34A] border-b-2 border-[#16A34A]"
+              : "text-slate-500 hover:text-[#0F1B3D]"
           }`}
         >
           In Progress ({inProgressCount})
         </button>
       </div>
 
-      {/* Grid */}
+      {/* Course Cards Grid */}
       {filteredCourses.length > 0 ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCourses.map((course) => (
@@ -154,18 +156,18 @@ const MyCourses = () => {
           ))}
         </div>
       ) : (
-        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
-          <p className="text-slate-500 mb-4">No courses found.</p>
+        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 space-y-4">
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">No enrolled courses found.</p>
           <Link
             to="/courses"
-            className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#0F1B3D] text-white font-bold text-xs hover:bg-[#1d2e5e] shadow-md"
           >
-            Explore Courses
+            <span>Explore Courses</span>
           </Link>
         </div>
       )}
 
-      {/* === 1. PLAYLIST MODAL (Video List) === */}
+      {/* === PLAYLIST MODAL (Video List) === */}
       <AnimatePresence>
         {selectedCourse && playingVideoIndex === null && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -174,81 +176,80 @@ const MyCourses = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={handleCloseAll}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#071838]/70 backdrop-blur-md cursor-pointer"
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-2xl max-h-[85vh] rounded-3xl shadow-2xl relative z-10 flex flex-col overflow-hidden"
+              className="bg-white w-full max-w-2xl max-h-[85vh] rounded-3xl shadow-2xl relative z-10 flex flex-col overflow-hidden border border-slate-200"
             >
-              {/* Header */}
-              <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-white">
+              {/* Dark Navy Header */}
+              <div className="p-6 bg-[#071838] text-white flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">
+                  <h2 className="text-xl md:text-2xl font-extrabold text-white leading-snug">
                     {selectedCourse.title}
                   </h2>
-                  <div className="flex items-center gap-2 mt-1 text-slate-500 text-sm">
-                    <List size={16} />
-                    <span className="font-bold">
+                  <div className="flex items-center gap-2 mt-1 text-[#FFD60A] text-xs font-bold">
+                    <List className="w-4 h-4" />
+                    <span>
                       {currentLectures.length} Videos Available
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={handleCloseAll}
-                  className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors"
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer"
                 >
-                  <X size={20} />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* List Area */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3 bg-slate-50">
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3.5 bg-slate-50">
                 {currentLectures.length > 0 ? (
                   currentLectures.map((video, idx) => (
                     <div
                       key={idx}
                       onClick={() => handlePlayVideo(idx)}
-                      className="group bg-white p-3 rounded-2xl border border-slate-200 hover:border-[#5edff4] hover:shadow-md transition-all cursor-pointer flex gap-4 items-center"
+                      className="group bg-white p-3.5 rounded-2xl border border-slate-200/90 hover:border-[#E6007E] hover:shadow-md transition-all cursor-pointer flex gap-4 items-center"
                     >
-                      {/* Thumb */}
-                      <div className="relative w-28 h-16 md:w-36 md:h-20 bg-slate-900 rounded-xl overflow-hidden shrink-0">
+                      {/* Thumbnail */}
+                      <div className="relative w-28 h-16 md:w-36 md:h-20 bg-[#071838] rounded-xl overflow-hidden shrink-0">
                         <img
                           src={getThumbnail(video.videoId)}
                           className="w-full h-full object-cover opacity-90"
                           alt=""
                         />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-all">
-                          <div className="p-1.5 bg-white/20 backdrop-blur-md rounded-full text-white">
-                            <Play size={14} fill="currentColor" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-all">
+                          <div className="p-2 bg-[#E6007E] rounded-full text-white shadow-md">
+                            <Play className="w-4 h-4 fill-current" />
                           </div>
                         </div>
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-0.5 block">
                           Lesson {idx + 1}
                         </span>
-                        <h3 className="font-bold text-slate-900 text-sm line-clamp-2 leading-snug group-hover:text-[#0891b2] transition-colors">
+                        <h3 className="font-extrabold text-[#0F1B3D] text-xs sm:text-sm line-clamp-2 leading-snug group-hover:text-[#E6007E] transition-colors">
                           {video.title || `Video Part ${idx + 1}`}
                         </h3>
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
-                          <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-medium">
-                            <FileVideo size={10} /> Video
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                          <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-600">
+                            <FileVideo size={10} /> Video Lesson
                           </span>
                         </div>
                       </div>
                       <ChevronRight
-                        size={18}
-                        className="text-slate-300 group-hover:text-[#5edff4]"
+                        className="w-5 h-5 text-slate-300 group-hover:text-[#E6007E] transition-colors"
                       />
                     </div>
                   ))
                 ) : (
                   <div className="text-center py-12">
-                    <p className="text-slate-400 font-medium">
+                    <p className="text-slate-400 text-xs font-bold">
                       No videos found in this course.
                     </p>
                   </div>
@@ -259,13 +260,13 @@ const MyCourses = () => {
         )}
       </AnimatePresence>
 
-      {/* === 2. VIDEO PLAYER (List bhej rahe hain taaki Next/Prev kaam kare) === */}
+      {/* Video Player */}
       {selectedCourse && playingVideoIndex !== null && (
         <CourseVideoPlayer
           course={selectedCourse}
-          playlist={currentLectures} // Sending Full List
+          playlist={currentLectures}
           initialIndex={playingVideoIndex}
-          onClose={() => setPlayingVideoIndex(null)} // Back to List
+          onClose={() => setPlayingVideoIndex(null)}
         />
       )}
     </div>

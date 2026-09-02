@@ -23,13 +23,14 @@ import {
   getDocs,
   updateDoc,
   doc,
+  setDoc,
   arrayUnion,
   arrayRemove,
   getDoc,
   onSnapshot,
   addDoc,
   serverTimestamp,
-  deleteDoc, // Added for pure Undo (Ctrl+Z)
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
@@ -338,46 +339,79 @@ const UserAccessManager = () => {
 
     try {
       const userRef = doc(db, "users", userData.id);
-      let updateData = {};
+      let targetIds = [];
       let selectedItem = null;
 
       if (type === "course") {
         if (!selectedCourse) return alert("Select a course first to revoke");
 
         if (selectedCourse === "all_courses") {
-          const allCourseIds = courses.map((c) => c.id);
-          updateData = { enrolledCourses: arrayRemove(...allCourseIds) };
-          // Fixed: Explicitly setting the price to 499 as requested
+          targetIds = courses.map((c) => c.id);
           selectedItem = {
             title: "Course Bundle",
             id: "all_courses_bundle",
             price: 499,
           };
         } else {
+          targetIds = [selectedCourse];
           selectedItem = courses.find((c) => c.id === selectedCourse);
-          updateData = { enrolledCourses: arrayRemove(selectedCourse) };
+        }
+
+        // 1. Clean users/{uid} document enrolledCourses array (supporting BOTH string IDs and Objects)
+        const currentUserSnap = await getDoc(userRef);
+        if (currentUserSnap.exists()) {
+          const currentEnrolled = currentUserSnap.data().enrolledCourses || [];
+          const updatedEnrolled = currentEnrolled.filter((item) => {
+            const itemCourseId = typeof item === "object" ? (item.courseId || item.id) : item;
+            return !targetIds.includes(itemCourseId);
+          });
+          await setDoc(userRef, { enrolledCourses: updatedEnrolled }, { merge: true });
+        }
+
+        // 2. Clean enrolledCourses/{uid} document (which CourseContext reads)
+        const enrolledDocRef = doc(db, "enrolledCourses", userData.id);
+        const enrolledSnap = await getDoc(enrolledDocRef);
+        if (enrolledSnap.exists()) {
+          const currentCourses = enrolledSnap.data().courses || [];
+          const updatedCourses = currentCourses.filter((item) => {
+            const itemCourseId = item.courseId || item.id;
+            return !targetIds.includes(itemCourseId);
+          });
+          await setDoc(enrolledDocRef, { courses: updatedCourses });
+        }
+
+        // 3. Delete order entries matching target IDs
+        for (const cId of targetIds) {
+          await undoOrderEntry(userData.id, cId, type);
         }
       } else if (type === "ebook") {
         if (!selectedEbook) return alert("Select an ebook first to revoke");
+        targetIds = [selectedEbook];
         selectedItem = ebooks.find((b) => b.id === selectedEbook);
-        updateData = { purchasedBooks: arrayRemove(selectedEbook) };
-      }
 
-      await updateDoc(userRef, updateData);
+        const currentUserSnap = await getDoc(userRef);
+        if (currentUserSnap.exists()) {
+          const currentBooks = currentUserSnap.data().purchasedBooks || [];
+          const updatedBooks = currentBooks.filter((item) => {
+            const itemBookId = typeof item === "object" ? (item.ebookId || item.id) : item;
+            return !targetIds.includes(itemBookId);
+          });
+          await setDoc(userRef, { purchasedBooks: updatedBooks }, { merge: true });
+        }
 
-      // Ctrl+Z logic: Erase the document from DB so sales subtracts exactly what was added
-      if (selectedItem) {
-        await undoOrderEntry(userData.id, selectedItem.id, type);
+        for (const bId of targetIds) {
+          await undoOrderEntry(userData.id, bId, type);
+        }
       }
 
       const updatedSnap = await getDoc(userRef);
       setUserData({ id: updatedSnap.id, ...updatedSnap.data() });
       setMessage({
         type: "success",
-        text: "Access Revoked & Sales Undone Successfully! 🚫",
+        text: "Access Revoked & Removed Completely! 🚫",
       });
     } catch (error) {
-      console.error(error);
+      console.error("Revoke error:", error);
       setMessage({ type: "error", text: "Failed to revoke access" });
     } finally {
       setLoading(false);

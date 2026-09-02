@@ -3,6 +3,8 @@ import { ShieldCheck, CheckCircle, ShoppingBag, BookOpen } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import AuthModal from "../../components/AuthModal";
 
+import { initiateRazorpayPayment } from "../../utils/razorpay";
+
 const BookPricingCard = ({ book, onAction }) => {
   const { currentUser } = useAuth();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -14,30 +16,27 @@ const BookPricingCard = ({ book, onAction }) => {
     finalPrice === 0 ||
     finalPrice === "0";
 
-  // [UPDATED] Direct Buy Logic (Redirects to Superprofile)
   const handleBuyClick = () => {
-    // 1. Auth Check
     if (!currentUser) {
-      // Save intent to buy (taaki login ke baad wapas aa sake)
       localStorage.setItem("pendingCheckoutBook", JSON.stringify(book));
       setIsAuthOpen(true);
       return;
     }
 
-    // 2. If Free -> Normal Action (Enroll/Read)
     if (isFree) {
       onAction();
       return;
     }
 
-    // 3. If Paid -> Redirect to Payment Gateway
-    if (book.paymentLink) {
-      window.location.href = book.paymentLink;
-    } else {
-      alert(
-        "Payment link not configured for this E-Book. Please contact support.",
-      );
-    }
+    initiateRazorpayPayment({
+      item: book,
+      type: "ebook",
+      currentUser: currentUser,
+      onSuccess: async () => {
+        alert("🎉 Payment Successful! Access granted to " + (book.title || "this E-Book"));
+        onAction();
+      },
+    });
   };
 
   return (

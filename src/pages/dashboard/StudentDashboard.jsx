@@ -13,20 +13,20 @@ import {
   Star,
   CheckCircle,
   Target,
-  Flame, // Added Flame
-  Crown, // Added Crown for Max Streak
+  Flame,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useCourse } from "../../context/CourseContext";
-// [NOTE] No Agency Context imported as per instruction
 import {
   doc,
   onSnapshot,
   updateDoc,
   getDoc,
   serverTimestamp,
-} from "firebase/firestore"; // [UPDATED] Added Firestore methods
+} from "firebase/firestore";
 import { db } from "../../firebase/config";
 
 const StudentDashboard = () => {
@@ -37,16 +37,16 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState([]);
   const [continueLearning, setContinueLearning] = useState(null);
-  const [activeSeconds, setActiveSeconds] = useState(0); // [UPDATED] Using raw seconds for precision
-  const [liveEnrolledCourses, setLiveEnrolledCourses] = useState([]); // [ADDED] Real-time data storage
+  const [activeSeconds, setActiveSeconds] = useState(0);
+  const [liveEnrolledCourses, setLiveEnrolledCourses] = useState([]);
   const [gamification, setGamification] = useState({
     level: 1,
     xp: 0,
     streak: 0,
-    maxStreak: 0, // [ADDED] Max Streak State
+    maxStreak: 0,
   });
 
-  // --- 1. STREAK TRACKING LOGIC (BACKEND) ---
+  // 1. Streak Tracking Logic
   useEffect(() => {
     const handleStreak = async () => {
       if (!currentUser) return;
@@ -76,28 +76,22 @@ const StudentDashboard = () => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays === 1) {
-              // Consecutive Login (Yesterday) -> Increment
               newStreak = currentStreak + 1;
               shouldUpdate = true;
             } else if (diffDays > 1) {
-              // Missed a day -> Reset
               newStreak = 1;
               shouldUpdate = true;
             }
-            // diffDays === 0 means same day login, do nothing
           } else {
-            // First time login
             newStreak = 1;
             shouldUpdate = true;
           }
 
-          // [LOGIC] Check & Update Maximum Streak
           let newMaxStreak = currentMaxStreak;
           if (newStreak > currentMaxStreak) {
             newMaxStreak = newStreak;
             shouldUpdate = true;
           } else if (currentStreak > currentMaxStreak) {
-            // Fallback sync
             newMaxStreak = currentStreak;
             shouldUpdate = true;
           }
@@ -118,22 +112,16 @@ const StudentDashboard = () => {
     handleStreak();
   }, [currentUser]);
 
-  // --- 2. REAL-TIME DATA LISTENER (FIXED FOR CUMULATIVE DATA) ---
+  // 2. Realtime User Data Listener
   useEffect(() => {
     if (!currentUser) return;
 
-    // Listen to the entire user document for live watchDuration and progress updates
     const unsub = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-
-        // Using enrolledCourses from context to ensure hydrated data (like the 25% progress)
         const courses = enrolledCourses || [];
-
-        // Update local real-time courses state
         setLiveEnrolledCourses(courses);
 
-        // Update Gamification (Streak/XP)
         setGamification({
           level: data.level || 1,
           xp: data.xp || 0,
@@ -141,22 +129,19 @@ const StudentDashboard = () => {
           maxStreak: data.maxStreak || 0,
         });
 
-        // Cumulative Watch Time Logic: Calculate total raw seconds from database map
         const totalSecs = courses.reduce(
           (acc, curr) => acc + (Number(curr.watchedDuration) || 0),
-          0,
+          0
         );
         setActiveSeconds(totalSecs);
 
-        // Continue Learning Logic using real-time progress
         if (courses.length > 0) {
           const sortedCourses = [...courses].sort(
             (a, b) =>
-              new Date(b.lastAccessed || 0) - new Date(a.lastAccessed || 0),
+              new Date(b.lastAccessed || 0) - new Date(a.lastAccessed || 0)
           );
-          // Find first course not 100% complete based on live progress field
           const nextCourse = sortedCourses.find(
-            (c) => (Number(c.progress) || 0) < 100,
+            (c) => (Number(c.progress) || 0) < 100
           );
           setContinueLearning(nextCourse || sortedCourses[0]);
         }
@@ -167,9 +152,8 @@ const StudentDashboard = () => {
     return () => unsub();
   }, [currentUser, enrolledCourses]);
 
-  // --- 3. UPDATE STATS CARDS (TIME FORMATTING FIX) ---
+  // 3. Stats Data Formatting
   useEffect(() => {
-    // Time Logic: Correctly display Seconds, Minutes, or Hours
     let timeDisplay = "0s";
     if (activeSeconds > 0) {
       if (activeSeconds < 60) {
@@ -181,9 +165,8 @@ const StudentDashboard = () => {
       }
     }
 
-    // Certificate Logic using real-time course data
     const certificatesCount = liveEnrolledCourses.filter(
-      (c) => Math.round(Number(c.progress) || 0) >= 100,
+      (c) => Math.round(Number(c.progress) || 0) >= 100
     ).length;
 
     setStats([
@@ -191,36 +174,36 @@ const StudentDashboard = () => {
         title: "Active Learning",
         value: timeDisplay,
         icon: Clock,
-        color: "text-[#5edff4]",
-        bg: "bg-[#5edff4]/10",
-        border: "border-[#5edff4]/20",
-        change: "Total Time",
+        color: "text-[#0284C7]",
+        bg: "bg-[#E0F2FE]",
+        border: "border-slate-200/90",
+        change: "Total Watch Time",
       },
       {
-        title: "Enrolled",
+        title: "Enrolled Courses",
         value: liveEnrolledCourses.length,
         icon: BookOpen,
-        color: "text-blue-400",
-        bg: "bg-blue-400/10",
-        border: "border-blue-400/20",
+        color: "text-[#16A34A]",
+        bg: "bg-[#DCFCE7]",
+        border: "border-slate-200/90",
         change: "In Progress",
       },
       {
         title: "Certificates",
         value: certificatesCount,
         icon: Award,
-        color: "text-purple-400",
-        bg: "bg-purple-400/10",
-        border: "border-purple-400/20",
+        color: "text-[#E6007E]",
+        bg: "bg-[#FCE7F3]",
+        border: "border-slate-200/90",
         change: "Earned",
       },
       {
         title: "Max Streak",
         value: `${gamification.maxStreak} Days`,
         icon: Crown,
-        color: "text-yellow-400",
-        bg: "bg-yellow-400/10",
-        border: "border-yellow-400/20",
+        color: "text-[#EA580C]",
+        bg: "bg-[#FFEDD5]",
+        border: "border-slate-200/90",
         change: "All Time Best",
       },
     ]);
@@ -228,170 +211,167 @@ const StudentDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="flex flex-col items-center gap-4">
-          <div className="size-16 border-4 border-slate-200 border-t-[#5edff4] rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-medium animate-pulse">Loading...</p>
+          <div className="w-12 h-12 border-4 border-slate-200 border-t-[#E6007E] rounded-full animate-spin"></div>
+          <p className="text-slate-400 text-xs font-bold animate-pulse">Loading Student Dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 md:space-y-8 pb-24 md:pb-12 font-sans text-slate-900">
-      {/* === HEADER SECTION (Mobile Optimized) === */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 bg-white p-5 md:p-6 rounded-3xl md:rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden">
-        {/* Background Blob */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#5edff4]/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
+    <div className="space-y-6 md:space-y-8 pb-24 md:pb-12 font-sans text-[#0F1B3D]">
+      
+      {/* === HEADER SECTION === */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 bg-white p-5 md:p-8 rounded-3xl border border-slate-200/90 shadow-md relative overflow-hidden">
+        {/* Background Accent Blob */}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-[#FCE7F3] rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2 opacity-60" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-2 md:gap-3 mb-1">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#0F1B3D]">
               Welcome to{" "}
-              <span className="text-[#0891b2] block md:inline">
-                Rehablito Academy
-              </span>
+              <span className="inline-flex font-black tracking-tight ml-1">
+                <span style={{ color: "#F51B22" }}>R</span>
+                <span style={{ color: "#FF8A16" }}>e</span>
+                <span style={{ color: "#FFE11A" }}>h</span>
+                <span style={{ color: "#63B632" }}>a</span>
+                <span style={{ color: "#2499C7" }}>b</span>
+                <span style={{ color: "#E6007E" }}>l</span>
+                <span style={{ color: "#A34773" }}>i</span>
+                <span style={{ color: "#FFD51A" }}>t</span>
+                <span style={{ color: "#FFE11A" }}>o</span>
+              </span>{" "}
+              Academy
             </h1>
           </div>
-          <p className="text-sm md:text-base text-slate-500 font-medium">
+          <p className="text-xs md:text-sm text-slate-500 font-medium">
             Hello,{" "}
-            <span className="font-bold text-slate-900">
+            <span className="font-bold text-[#0F1B3D]">
               {currentUser?.displayName?.split(" ")[0] || "Student"}
             </span>
-            ! Ready to learn?
+            ! Ready to continue your therapy learning journey?
           </p>
         </div>
 
         {/* Current Streak Badge */}
-        <div className="absolute top-5 right-5 md:relative md:top-auto md:right-auto z-10 flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-100 text-orange-600 rounded-full shadow-sm">
+        <div className="flex items-center gap-3 z-10">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#FFEDD5] border border-[#FFD8A8] text-[#EA580C] rounded-full shadow-xs">
             <Flame
-              size={16}
-              className="fill-orange-500 text-orange-500 animate-pulse"
+              size={18}
+              className="fill-[#EA580C] text-[#EA580C] animate-pulse"
             />
-            <span className="text-xs md:text-sm font-bold">
+            <span className="text-xs md:text-sm font-extrabold">
               {gamification.streak} Day Streak
             </span>
           </div>
 
-          <button className="p-2.5 md:p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:border-[#5edff4] hover:text-[#0891b2] transition-all shadow-sm hidden md:flex">
-            <Calendar size={18} className="md:w-5 md:h-5" />
+          <button className="p-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl hover:bg-slate-50 transition-all shadow-xs hidden md:flex cursor-pointer">
+            <Calendar className="w-5 h-5 text-[#0F1B3D]" />
           </button>
         </div>
       </div>
 
-      {/* === STATS GRID === */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* === STATS GRID (4 COLORFUL CARDS) === */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
         {stats.map((stat, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`bg-white p-4 md:p-5 rounded-3xl md:rounded-[2rem] border ${stat.border} shadow-sm hover:shadow-md transition-all group relative overflow-hidden`}
+            className={`bg-white p-5 rounded-3xl border ${stat.border} shadow-sm hover:shadow-md transition-all group relative overflow-hidden`}
           >
-            <div
-              className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity`}
-            >
-              <stat.icon
-                size={50}
-                className={`${stat.color.replace("text-", "stroke-")} md:w-[60px] md:h-[60px]`}
-              />
+            <div className="flex justify-between items-start mb-3">
+              <div
+                className={`p-3 rounded-2xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform duration-300 shadow-xs`}
+              >
+                <stat.icon className="w-6 h-6" />
+              </div>
             </div>
-
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-3 md:mb-4">
-                <div
-                  className={`p-2.5 md:p-3 rounded-2xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform duration-300`}
-                >
-                  <stat.icon size={20} className="md:w-[22px] md:h-[22px]" />
-                </div>
-              </div>
-              <div>
-                <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5 md:mb-1">
-                  {stat.title}
-                </p>
-                <h3 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-                  {stat.value}
-                </h3>
-                <p className="text-[10px] md:text-xs font-medium text-slate-400 mt-1 md:mt-2 flex items-center gap-1">
-                  <TrendingUp size={10} className="md:w-3 md:h-3" />{" "}
-                  {stat.change}
-                </p>
-              </div>
+            <div>
+              <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">
+                {stat.title}
+              </p>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-[#0F1B3D] tracking-tight">
+                {stat.value}
+              </h3>
+              <p className="text-[11px] font-semibold text-slate-500 mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-[#16A34A]" />{" "}
+                {stat.change}
+              </p>
             </div>
           </motion.div>
         ))}
       </div>
 
+      {/* === MAIN LAYOUT: CONTINUE LEARNING & DISCOVER === */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        {/* === MAIN: CONTINUE LEARNING === */}
+        
+        {/* RESUME LEARNING MAIN BANNER */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-2 bg-slate-900 rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[280px] md:min-h-[300px] shadow-2xl shadow-slate-900/20"
+          className="lg:col-span-2 bg-[#071838] rounded-3xl p-6 md:p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[300px] shadow-xl border border-slate-800"
         >
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#5edff4] rounded-full blur-[180px] opacity-10 translate-x-1/3 -translate-y-1/3 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-600 rounded-full blur-[120px] opacity-15 -translate-x-1/3 translate-y-1/3 pointer-events-none" />
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none" />
+          {/* Background Glows */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#E6007E] rounded-full blur-[140px] opacity-30 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#FFD60A] rounded-full blur-[140px] opacity-20 pointer-events-none" />
 
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4 md:mb-6">
-              <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[10px] md:text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-lg">
-                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#5edff4] animate-pulse"></span>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm text-[#FFD60A]">
+                <span className="w-2 h-2 rounded-full bg-[#FFD60A] animate-pulse"></span>
                 Resume Learning
               </span>
             </div>
 
             {continueLearning ? (
               <div className="max-w-xl">
-                <h2 className="text-2xl md:text-4xl font-black mb-3 md:mb-4 leading-tight line-clamp-2">
+                <h2 className="text-2xl md:text-3xl font-extrabold mb-3 leading-tight line-clamp-2 text-white">
                   {continueLearning.title}
                 </h2>
-                <div className="flex items-center gap-4 mb-6 md:mb-8">
-                  <p className="text-slate-400 text-xs md:text-sm font-medium flex items-center gap-2">
-                    <Star
-                      size={14}
-                      className="text-yellow-400 fill-current md:w-4 md:h-4"
-                    />{" "}
-                    Premium Course
+                <div className="flex items-center gap-4 mb-6">
+                  <p className="text-slate-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+                    <Star className="w-4 h-4 text-[#FFD60A] fill-[#FFD60A]" /> Premium Therapy Course
                   </p>
                 </div>
               </div>
             ) : (
-              <h2 className="text-2xl md:text-4xl font-black mb-4 leading-tight">
-                Start your first course today!
+              <h2 className="text-2xl md:text-3xl font-extrabold mb-4 leading-tight text-white">
+                Start your first therapy course today!
               </h2>
             )}
           </div>
 
           {/* Progress Card */}
-          <div className="relative z-10 bg-white/10 backdrop-blur-xl border border-white/10 p-4 md:p-5 rounded-2xl md:rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 md:gap-6 shadow-inner">
+          <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/15 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner">
             {continueLearning ? (
               <div className="flex-1 w-full">
                 <div className="flex justify-between text-xs font-bold mb-2">
-                  <span className="text-slate-200 flex items-center gap-2">
-                    <Target size={14} /> Course Progress
+                  <span className="text-slate-200 flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-[#FFD60A]" /> Course Progress
                   </span>
-                  <span className="text-[#5edff4]">
+                  <span className="text-[#FFD60A]">
                     {Math.round(Number(continueLearning.progress) || 0)}%
                   </span>
                 </div>
-                <div className="h-2.5 md:h-3 bg-slate-950/50 rounded-full overflow-hidden border border-white/5">
+                <div className="h-2.5 bg-black/40 rounded-full overflow-hidden border border-white/10">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{
                       width: `${Math.round(Number(continueLearning.progress) || 0)}%`,
                     }}
                     transition={{ duration: 1, delay: 0.5 }}
-                    className="h-full bg-gradient-to-r from-[#5edff4] to-[#0891b2] rounded-full shadow-[0_0_15px_rgba(94,223,244,0.5)]"
+                    className="h-full bg-gradient-to-r from-[#E6007E] via-[#2499C7] to-[#FFD60A] rounded-full shadow-md"
                   />
                 </div>
               </div>
             ) : (
-              <div className="flex-1 text-slate-300 text-sm font-medium w-full text-center sm:text-left">
-                Browse our catalog to begin.
+              <div className="flex-1 text-slate-300 text-xs sm:text-sm font-medium w-full text-center sm:text-left">
+                Browse our course catalog to begin learning.
               </div>
             )}
 
@@ -400,70 +380,55 @@ const StudentDashboard = () => {
                 navigate(
                   continueLearning
                     ? "/dashboard/my-courses"
-                    : "/dashboard/explore",
+                    : "/dashboard/explore"
                 )
               }
-              className="w-full sm:w-auto bg-white text-slate-900 p-3 md:p-4 rounded-xl md:rounded-2xl hover:scale-105 hover:bg-[#5edff4] transition-all shadow-xl shadow-black/20 group flex justify-center items-center"
+              className="w-full sm:w-auto bg-white text-[#0F1B3D] p-3.5 rounded-xl hover:bg-[#FFD60A] transition-all shadow-md group flex justify-center items-center cursor-pointer"
             >
               {continueLearning ? (
-                <PlayCircle
-                  size={24}
-                  className="group-hover:fill-slate-900 md:w-[28px] md:h-[28px]"
-                />
+                <PlayCircle className="w-6 h-6 text-[#0F1B3D] group-hover:scale-110 transition-transform" />
               ) : (
-                <ArrowRight size={20} className="md:w-[24px] md:h-[24px]" />
+                <ArrowRight className="w-6 h-6 text-[#0F1B3D] group-hover:translate-x-1 transition-transform" />
               )}
             </button>
           </div>
         </motion.div>
 
-        {/* === DISCOVER WIDGET === */}
+        {/* DISCOVER CATALOG CARD */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white border border-slate-100 rounded-[2rem] md:rounded-[2.5rem] p-5 md:p-6 shadow-sm flex flex-col justify-between min-h-[220px]"
+          className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-md flex flex-col justify-between min-h-[260px]"
         >
           <div>
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <h3 className="font-bold text-base md:text-lg text-slate-900">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-extrabold text-base text-[#0F1B3D]">
                 Discover
               </h3>
-              <div className="p-2 bg-purple-50 rounded-full text-purple-600">
-                <ShoppingBag size={18} className="md:w-5 md:h-5" />
+              <div className="p-2.5 bg-[#FCE7F3] rounded-2xl text-[#E6007E]">
+                <ShoppingBag className="w-5 h-5" />
               </div>
             </div>
-            <h4 className="text-xl md:text-2xl font-black text-slate-900 mb-2">
-              New Arrivals
+            <h4 className="text-xl font-extrabold text-[#0F1B3D] mb-2">
+              New Programs
             </h4>
-            <p className="text-slate-500 text-xs md:text-sm leading-relaxed line-clamp-3">
-              Explore the latest therapeutic courses added to Rehablito Academy. Stay
-              ahead of the curve in providing clinical care.
+            <p className="text-slate-500 text-xs leading-relaxed line-clamp-3">
+              Explore the latest therapeutic programs added to Rehablito Academy for speech therapy, autism, and child development.
             </p>
           </div>
 
-          <div className="mt-4 md:mt-6">
-            <div className="flex items-center -space-x-2 mb-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] md:text-xs font-bold text-slate-500"
-                >
-                  Care
-                </div>
-              ))}
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border-2 border-white bg-slate-900 flex items-center justify-center text-[10px] md:text-xs font-bold text-white">
-                +5
-              </div>
-            </div>
+          <div className="mt-6">
             <button
               onClick={() => navigate("/dashboard/explore")}
-              className="w-full py-3 md:py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-[#0891b2] transition-colors shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2 text-sm md:text-base"
+              className="w-full py-3.5 bg-[#0F1B3D] text-white font-bold rounded-full hover:bg-[#1b2e5e] transition-colors shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
             >
-              Browse Catalog <ArrowRight size={16} />
+              <span>Browse Catalog</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>
+
       </div>
 
       {/* === RECENT MILESTONES === */}
@@ -471,43 +436,44 @@ const StudentDashboard = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="bg-white border border-slate-100 rounded-[2rem] p-5 md:p-8 shadow-sm"
+        className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-md"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-6 gap-3">
-          <h3 className="font-bold text-base md:text-lg text-slate-900 flex items-center gap-2">
-            <Award className="text-yellow-500" size={18} /> Recent Milestones
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+          <h3 className="font-extrabold text-base sm:text-lg text-[#0F1B3D] flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#EA580C]" /> Recent Milestones
           </h3>
           <Link
             to="/dashboard/certificates"
-            className="text-xs md:text-sm font-bold text-[#0891b2] bg-[#0891b2]/5 hover:bg-[#0891b2]/10 px-3 py-2 rounded-lg transition-colors text-center"
+            className="text-xs font-bold text-[#E6007E] bg-[#FCE7F3] hover:bg-[#fbcfe8] px-4 py-2 rounded-full transition-colors text-center shadow-xs"
           >
             View Certificates
           </Link>
         </div>
 
-        <div className="bg-slate-50 rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col md:flex-row items-center gap-4 md:gap-6 border border-slate-100 border-dashed hover:border-[#5edff4]/50 transition-colors">
-          <div className="size-16 md:size-20 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-amber-500/20 rotate-3 transform transition-transform group-hover:rotate-6 shrink-0">
-            <Star size={32} className="fill-current md:w-[40px] md:h-[40px]" />
+        <div className="bg-slate-50 rounded-2xl p-5 md:p-6 flex flex-col md:flex-row items-center gap-5 border border-slate-200/80 border-dashed hover:border-[#E6007E]/50 transition-colors">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#FFD60A] to-[#EA580C] rounded-2xl flex items-center justify-center text-white shadow-md rotate-3 shrink-0">
+            <Star className="w-8 h-8 fill-current text-white" />
           </div>
           <div className="text-center md:text-left flex-1">
-            <h4 className="font-bold text-slate-900 text-lg md:text-xl">
+            <h4 className="font-extrabold text-[#0F1B3D] text-base sm:text-lg">
               {gamification.streak > 0
-                ? `You're on a ${gamification.streak} Day Streak!`
-                : "Start Your Streak Today"}
+                ? `You're on a ${gamification.streak} Day Learning Streak!`
+                : "Start Your Learning Streak Today"}
             </h4>
-            <p className="text-slate-500 text-xs md:text-sm mt-1 md:mt-2 max-w-lg leading-relaxed">
+            <p className="text-slate-500 text-xs mt-1 max-w-lg leading-relaxed font-medium">
               {gamification.streak > 0
-                ? `Consistency is key! Keep learning daily on Rehablito Academy to increase your streak and unlock rewards.`
-                : "Log in and learn daily to build your streak and stay ahead in your clinical career."}
+                ? `Consistency is key! Keep logging in daily to Rehablito Academy to increase your streak and master therapy modules.`
+                : "Log in daily to build your streak and gain confidence in child rehabilitation practices."}
             </p>
           </div>
           {gamification.streak > 0 && (
-            <div className="px-3 py-1.5 md:px-4 md:py-2 bg-green-100 text-green-700 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 shrink-0">
-              <CheckCircle size={14} className="md:w-4 md:h-4" /> Streak Active
+            <div className="px-3.5 py-2 bg-[#DCFCE7] text-[#16A34A] rounded-full font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-xs">
+              <CheckCircle className="w-4 h-4" /> Streak Active
             </div>
           )}
         </div>
       </motion.div>
+
     </div>
   );
 };

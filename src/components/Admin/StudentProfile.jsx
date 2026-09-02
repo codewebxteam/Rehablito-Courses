@@ -97,10 +97,12 @@ const StudentProfile = ({ student, onClose }) => {
         });
 
         // B. FETCH MANUAL COURSES (From User's 'enrolledCourses' Array)
-        // If a course is in the user's list but NOT in orders, fetch its name from DB
         if (student.enrolledCourses && Array.isArray(student.enrolledCourses)) {
-          const missingCourses = student.enrolledCourses.filter(
-            (id) => !historyMap.has(id),
+          const rawCourseIds = student.enrolledCourses.map((c) =>
+            typeof c === "object" ? c.courseId || c.id : c
+          );
+          const missingCourses = rawCourseIds.filter(
+            (id) => id && typeof id === "string" && !historyMap.has(id)
           );
 
           await Promise.all(
@@ -115,13 +117,12 @@ const StudentProfile = ({ student, onClose }) => {
                     id: courseId,
                     title: cData.title || "Untitled Course",
                     type: "course",
-                    price: cData.price || 0, // Show actual price even if granted
-                    date: new Date(student.createdAt), // Fallback date
-                    source: "manual", // Granted/Manual Access
+                    price: cData.price || 0,
+                    date: new Date(student.createdAt),
+                    source: "manual",
                     status: "Granted",
                   });
                 } else {
-                  // If course deleted, still show ID
                   historyMap.set(courseId, {
                     id: courseId,
                     title: `Legacy Course (ID: ${courseId})`,
@@ -135,14 +136,17 @@ const StudentProfile = ({ student, onClose }) => {
               } catch (e) {
                 console.error(e);
               }
-            }),
+            })
           );
         }
 
         // C. FETCH MANUAL E-BOOKS (From User's 'purchasedBooks' Array)
         if (student.purchasedBooks && Array.isArray(student.purchasedBooks)) {
-          const missingBooks = student.purchasedBooks.filter(
-            (id) => !historyMap.has(id),
+          const rawBookIds = student.purchasedBooks.map((b) =>
+            typeof b === "object" ? b.ebookId || b.id : b
+          );
+          const missingBooks = rawBookIds.filter(
+            (id) => id && typeof id === "string" && !historyMap.has(id)
           );
 
           await Promise.all(
@@ -166,7 +170,7 @@ const StudentProfile = ({ student, onClose }) => {
               } catch (e) {
                 console.error(e);
               }
-            }),
+            })
           );
         }
 

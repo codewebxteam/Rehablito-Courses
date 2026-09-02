@@ -18,6 +18,9 @@ import {
   ShieldCheck,
   Zap,
   BookMarked,
+  Heart,
+  UserCheck,
+  CheckCircle2,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -27,6 +30,8 @@ import CourseVideoPlayer from "../components/CourseVideoPlayer";
 import StatsAndNewsletter from "../components/StatsAndNewsletter";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
+
+import { initiateRazorpayPayment } from "../utils/razorpay";
 
 // Standard preset therapy categories
 const PRESET_TABS = [
@@ -52,7 +57,7 @@ const Courses = () => {
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [playingCourse, setPlayingCourse] = useState(null);
 
-  // REAL-TIME FIRESTORE FETCHING LOGIC (Preserved 100%)
+  // REAL-TIME FIRESTORE FETCHING LOGIC
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -86,8 +91,6 @@ const Courses = () => {
   // Dynamically build category tabs including custom categories added by Admin
   const dynamicCategoryTabs = useMemo(() => {
     const tabs = [...PRESET_TABS];
-    
-    // Collect extra custom categories from uploaded courses
     courses.forEach((c) => {
       if (c.category) {
         const catName = c.category.trim();
@@ -128,13 +131,25 @@ const Courses = () => {
     }
   };
 
+  const { enrollCourse } = useCourse();
+
   const handleBuyClick = (course) => {
     if (!currentUser) {
       localStorage.setItem("pendingCheckoutCourse", JSON.stringify(course));
       setIsAuthOpen(true);
       return;
     }
-    processPayment(course);
+
+    initiateRazorpayPayment({
+      item: course,
+      type: "course",
+      currentUser: currentUser,
+      onSuccess: async () => {
+        await enrollCourse(course);
+        alert("🎉 Payment Successful! Access granted to " + (course.title || "the course"));
+        navigate("/dashboard/my-courses");
+      },
+    });
   };
 
   // Filter Logic
@@ -165,10 +180,128 @@ const Courses = () => {
   });
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] font-sans text-[#0F1B3D] pt-32 sm:pt-36 lg:pt-36 pb-16">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10">
+    <div className="w-full bg-[#F8FAFC] font-sans text-[#0F1B3D]">
+      
+      {/* ================= 1. HERO SECTION WITH RESPONSIVE BACKGROUND IMAGES ================= */}
+      <section className="relative w-full h-screen min-h-screen overflow-hidden flex items-start lg:items-center pt-28 sm:pt-32 lg:pt-28 pb-12">
+        
+        {/* Responsive Background Banner Images (Full Screen Cover) */}
+        <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
+          <picture className="w-full h-full block">
+            {/* Desktop Banner Image */}
+            <source
+              media="(min-width: 1024px)"
+              srcSet="https://ik.imagekit.io/5glnyqfxu/Courses/ARehab.webp"
+            />
+            {/* Mobile / Phone Banner Image */}
+            <img
+              src="https://ik.imagekit.io/5glnyqfxu/Courses/ARehabPhone.webp"
+              alt="Rehablito Courses Banner"
+              className="w-full h-full object-fill lg:object-cover object-top lg:object-right"
+              loading="eager"
+            />
+          </picture>
+          <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/40 to-transparent lg:from-white/80 lg:via-white/40 lg:to-transparent" />
+        </div>
 
-        {/* ================= 1. HEADER CONTROLS BAR (SEARCH ONLY) ================= */}
+        {/* Hero Content Overlay */}
+        <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-12 py-4">
+          <div className="w-full lg:w-[52%] flex flex-col items-center lg:items-start text-center lg:text-left">
+            
+            {/* Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 shadow-md mb-4">
+              <Heart className="w-4 h-4 text-[#E6007E] fill-[#E6007E]" />
+              <span className="text-xs sm:text-sm font-bold text-[#0F1B3D]">
+                Therapy & Guidance Courses
+              </span>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3.3rem] font-extrabold tracking-tight leading-[1.12] text-[#0F1B3D] mb-4">
+              Empowering Courses For Every Child's{" "}
+              <span className="inline-flex font-black tracking-tight">
+                <span style={{ color: "#F51B22" }}>P</span>
+                <span style={{ color: "#FF8A16" }}>r</span>
+                <span style={{ color: "#FFE11A" }}>o</span>
+                <span style={{ color: "#63B632" }}>g</span>
+                <span style={{ color: "#2499C7" }}>r</span>
+                <span style={{ color: "#E6007E" }}>e</span>
+                <span style={{ color: "#A34773" }}>s</span>
+                <span style={{ color: "#FFD51A" }}>s</span>
+              </span>
+              .
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-slate-800 text-xs sm:text-sm md:text-base font-semibold leading-relaxed max-w-[550px] mb-6">
+              Browse our expert-led certified courses in speech therapy, autism care, occupational therapy, and pediatric rehabilitation designed for parents and caregivers.
+            </p>
+
+            {/* Feature Badges (Hidden on Phone View) */}
+            <div className="hidden sm:flex flex-wrap items-center justify-center lg:justify-start gap-3 mb-6">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200 shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[#FCE7F3] text-[#E6007E] flex items-center justify-center shrink-0">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-[#0F1B3D]">Expert Certified</p>
+                  <p className="text-[10px] text-slate-500 font-medium">By leading pros</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200 shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shrink-0">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-[#0F1B3D]">Evidence Based</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Research backed</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-200 shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-[#DCFCE7] text-[#16A34A] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-[#0F1B3D]">Personalized</p>
+                  <p className="text-[10px] text-slate-500 font-medium">For every child</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 5 Stats Banner (Hidden on Phone View) */}
+            <div className="hidden sm:grid w-full max-w-[660px] bg-white/95 backdrop-blur-md border border-slate-200 rounded-3xl p-4 shadow-lg grid-cols-5 gap-2">
+              <div className="text-center border-r border-slate-200 pr-1">
+                <p className="text-base sm:text-lg font-extrabold text-[#0F1B3D]">1000+</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Happy Families</p>
+              </div>
+              <div className="text-center border-r border-slate-200 pr-1">
+                <p className="text-base sm:text-lg font-extrabold text-[#0F1B3D]">50+</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Therapists</p>
+              </div>
+              <div className="text-center border-r border-slate-200 pr-1">
+                <p className="text-base sm:text-lg font-extrabold text-[#0F1B3D]">20+</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Programs</p>
+              </div>
+              <div className="text-center border-r border-slate-200 pr-1">
+                <p className="text-base sm:text-lg font-extrabold text-[#0F1B3D]">5000+</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Sessions</p>
+              </div>
+              <div className="text-center">
+                <p className="text-base sm:text-lg font-extrabold text-[#0F1B3D]">98%</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Satisfaction</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ================= 2. COURSES CATALOG SECTION ================= */}
+      <section className="py-14 sm:py-16 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10">
+
+        {/* HEADER CONTROLS BAR (SEARCH INPUT) */}
         <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs mb-6 sm:mb-8">
           <div className="relative w-full max-w-xl mx-auto md:mx-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
@@ -182,7 +315,7 @@ const Courses = () => {
           </div>
         </div>
 
-        {/* ================= 2. HORIZONTAL CATEGORY TABS ================= */}
+        {/* HORIZONTAL CATEGORY TABS */}
         <div className="flex items-center gap-3 overflow-x-auto pb-4 mb-8 no-scrollbar scroll-smooth">
           {dynamicCategoryTabs.map((tab) => {
             const IconComp = tab.icon;
@@ -212,7 +345,7 @@ const Courses = () => {
           })}
         </div>
 
-        {/* ================= 3. SECTION HEADLINE ROW ================= */}
+        {/* SECTION HEADLINE ROW */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 sm:mb-8">
           <div>
             <div className="inline-flex items-center gap-2">
@@ -231,7 +364,7 @@ const Courses = () => {
           </p>
         </div>
 
-        {/* ================= 4. REAL-TIME COURSES GRID ================= */}
+        {/* REAL-TIME COURSES GRID */}
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="w-10 h-10 text-[#0F1B3D] animate-spin" />
@@ -273,7 +406,7 @@ const Courses = () => {
           </AnimatePresence>
         )}
 
-        {/* ================= 5. WHY LEARN WITH REHABLITO? SECTION ================= */}
+        {/* WHY LEARN WITH REHABLITO? SECTION */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-slate-200/80 shadow-xs mb-12">
           <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#0F1B3D] text-center mb-8 sm:mb-10">
             Why Learn With{" "}
@@ -359,10 +492,10 @@ const Courses = () => {
           </div>
         </div>
 
-        {/* ================= 6. STATS & WHATSAPP BANNER ================= */}
+        {/* STATS & WHATSAPP BANNER */}
         <StatsAndNewsletter />
 
-      </div>
+      </section>
 
       <AuthModal
         isOpen={isAuthOpen}

@@ -28,8 +28,12 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+import { useCourse } from "../../context/CourseContext";
+import { initiateRazorpayPayment } from "../../utils/razorpay";
+
 const PricingCard = ({ course, isEnrolled }) => {
   const { currentUser } = useAuth();
+  const { enrollCourse } = useCourse();
   const navigate = useNavigate();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [notifyLoading, setNotifyLoading] = useState(false);
@@ -65,51 +69,23 @@ const PricingCard = ({ course, isEnrolled }) => {
         const pendingCourse = JSON.parse(pendingCourseJSON);
 
         if (pendingCourse.id === course.id) {
-          setIsSyncing(true);
-
-          try {
-            const userRef = doc(db, "users", currentUser.uid);
-            const userSnap = await getDoc(userRef);
-
-            if (!userSnap.exists()) {
-              await setDoc(userRef, {
-                uid: currentUser.uid,
-                name: currentUser.displayName || "Parent / Caregiver",
-                email: currentUser.email,
-                photoURL: currentUser.photoURL || "",
-                role: "student",
-                createdAt: serverTimestamp(),
-                lastLogin: serverTimestamp(),
-                enrolledCourses: [],
-                purchasedBooks: [],
-                phone: currentUser.phoneNumber || "",
-                interestedCourse: pendingCourse?.title || "None",
-                registrationSource: "PricingCard_EnrollNow",
-              });
-            }
-
-            setTimeout(() => {
-              localStorage.removeItem("pendingCheckoutCourse");
-              setIsSyncing(false);
-
-              if (pendingCourse.paymentLink) {
-                window.location.href = pendingCourse.paymentLink;
-              } else {
-                navigate("/dashboard");
-              }
-            }, 2500);
-          } catch (error) {
-            console.error("Error during sync:", error);
-            setIsSyncing(false);
-            if (pendingCourse.paymentLink)
-              window.location.href = pendingCourse.paymentLink;
-          }
+          localStorage.removeItem("pendingCheckoutCourse");
+          initiateRazorpayPayment({
+            item: pendingCourse,
+            type: "course",
+            currentUser: currentUser,
+            onSuccess: async () => {
+              await enrollCourse(pendingCourse);
+              alert("🎉 Payment Successful! Access granted to " + (pendingCourse.title || "the course"));
+              navigate("/dashboard/my-courses");
+            },
+          });
         }
       }
     };
 
     handleRedirectionAndSync();
-  }, [currentUser, course.id, navigate]);
+  }, [currentUser, course.id, navigate, enrollCourse]);
 
   const formatCurrency = (amount) => {
     if (!amount) return "Free Access";
@@ -124,18 +100,22 @@ const PricingCard = ({ course, isEnrolled }) => {
   const displayOriginalPrice = formatCurrency(course.originalPrice);
 
   const handleBuyClick = () => {
-    if (!course?.paymentLink && displayPrice !== "Free Access") {
-      alert("Payment link is not configured. Please contact support.");
-      return;
-    }
-
     if (!currentUser) {
       localStorage.setItem("pendingCheckoutCourse", JSON.stringify(course));
       setIsAuthOpen(true);
       return;
     }
 
-    window.location.href = course.paymentLink;
+    initiateRazorpayPayment({
+      item: course,
+      type: "course",
+      currentUser: currentUser,
+      onSuccess: async () => {
+        await enrollCourse(course);
+        alert("🎉 Payment Successful! Access granted to " + (course.title || "the course"));
+        navigate("/dashboard/my-courses");
+      },
+    });
   };
 
   const handleNotifyAdmin = async () => {

@@ -81,13 +81,23 @@ const CourseDetails = () => {
   }, [id]);
 
   const handleEnroll = () => {
-    if (!course?.paymentLink) return alert("Payment link not configured.");
+    if (!course) return;
     if (!currentUser) {
       localStorage.setItem("pendingCheckoutCourse", JSON.stringify(course));
       setIsAuthOpen(true);
       return;
     }
-    window.location.href = course.paymentLink;
+
+    initiateRazorpayPayment({
+      item: course,
+      type: "course",
+      currentUser: currentUser,
+      onSuccess: async () => {
+        await enrollCourse(course);
+        alert("🎉 Payment Successful! Access granted to " + (course.title || "the course"));
+        navigate("/dashboard/my-courses");
+      },
+    });
   };
 
   const openPlayer = (playlist, index = 0) => {
