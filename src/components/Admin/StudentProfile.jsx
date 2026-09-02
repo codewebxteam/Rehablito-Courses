@@ -140,40 +140,6 @@ const StudentProfile = ({ student, onClose }) => {
           );
         }
 
-        // C. FETCH MANUAL E-BOOKS (From User's 'purchasedBooks' Array)
-        if (student.purchasedBooks && Array.isArray(student.purchasedBooks)) {
-          const rawBookIds = student.purchasedBooks.map((b) =>
-            typeof b === "object" ? b.ebookId || b.id : b
-          );
-          const missingBooks = rawBookIds.filter(
-            (id) => id && typeof id === "string" && !historyMap.has(id)
-          );
-
-          await Promise.all(
-            missingBooks.map(async (bookId) => {
-              try {
-                const bookRef = doc(db, "ebooks", bookId);
-                const bookSnap = await getDoc(bookRef);
-
-                if (bookSnap.exists()) {
-                  const bData = bookSnap.data();
-                  historyMap.set(bookId, {
-                    id: bookId,
-                    title: bData.title || "Untitled E-Book",
-                    type: "ebook",
-                    price: bData.price || 0,
-                    date: new Date(student.createdAt),
-                    source: "manual",
-                    status: "Granted",
-                  });
-                }
-              } catch (e) {
-                console.error(e);
-              }
-            })
-          );
-        }
-
         // Convert Map to Array & Sort by Date (Newest First)
         const combinedList = Array.from(historyMap.values()).sort(
           (a, b) => b.date - a.date,

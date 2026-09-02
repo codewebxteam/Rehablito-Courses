@@ -48,7 +48,6 @@ const AdminLayout = () => {
     { label: "Students", path: "/admin/students", icon: Users },
     { label: "Sales", path: "/admin/sales", icon: TrendingUp },
     { label: "Courses", path: "/admin/courses", icon: GraduationCap },
-    { label: "E-Books", path: "/admin/ebooks", icon: BookOpen },
     { label: "Manage Access", path: "/admin/users", icon: Unlock },
   ];
 

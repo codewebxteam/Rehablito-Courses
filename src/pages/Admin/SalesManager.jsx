@@ -290,7 +290,7 @@ const SalesManager = () => {
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
           {/* Type Filter Buttons */}
           <div className="flex bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
-            {["All", "Course", "Ebook"].map((type) => (
+            {["All", "Course"].map((type) => (
               <button
                 key={type}
                 onClick={() => setTypeFilter(type)}

@@ -354,11 +354,7 @@ const StudentData = () => {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                             <BookOpen size={12} className="text-indigo-500" />{" "}
-                            {student.coursesCount} Courses
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                            <FileText size={12} className="text-orange-500" />{" "}
-                            {student.ebooksCount} E-Books
+                            {student.coursesCount} Courses Enrolled
                           </div>
                         </div>
                       </td>
