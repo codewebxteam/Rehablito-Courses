@@ -1,10 +1,8 @@
 import React from "react";
 import Hero from "../components/Hero";
-import MarqueeSection from "../components/MarqueeSection";
-import CardsSwap from "../components/CardsSwap";
-import DigitalProducts from "../components/DigitalProducts";
-import RoadmapSection from "../components/RoadmapSection";
-import FAQSection from "../components/FAQSection";
+import ExploreCourses from "../components/ExploreCourses";
+import WhyChooseAndReviews from "../components/WhyChooseAndReviews";
+import StatsAndNewsletter from "../components/StatsAndNewsletter";
 
 const Home = () => {
   return (
@@ -14,30 +12,19 @@ const Home = () => {
         <Hero />
       </section>
 
-      {/* Section 2: Marquee (Strip) */}
+      {/* Section 2: Explore Our Online Courses */}
       <section className="w-full">
-        <MarqueeSection />
+        <ExploreCourses />
       </section>
 
-      {/* Section 3: Syllabus/Cards (Academy Tracks) */}
-      {/* [FIXED] Added 'pb-24 lg:pb-0' to fix mobile cut-off & gap issue */}
-      <section className="w-full relative z-10 pb-24 lg:pb-0">
-        <CardsSwap />
+      {/* Section 3: Why Choose Rehablito & What Parents Say Reviews */}
+      <section className="w-full">
+        <WhyChooseAndReviews />
       </section>
 
-      {/* Section 4: Featured Courses */}
+      {/* Section 4: Stats Counter & WhatsApp Stay Updated Banner */}
       <section className="w-full">
-        <DigitalProducts />
-      </section>
-
-      {/* Section 5: Roadmap (How it works) */}
-      <section className="w-full">
-        <RoadmapSection />
-      </section>
-
-      {/* Section 6: FAQs */}
-      <section className="w-full">
-        <FAQSection />
+        <StatsAndNewsletter />
       </section>
     </main>
   );

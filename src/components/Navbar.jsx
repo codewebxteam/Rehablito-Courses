@@ -1,53 +1,99 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Home,
-  GraduationCap,
-  Users,
-  Mail,
-  LogIn,
   User,
   LogOut,
   LayoutDashboard,
   Settings,
   ChevronDown,
-  Lock,
+  Menu,
+  X,
+  BookOpen,
+  ArrowRight,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import AuthModal from "./AuthModal";
 import { useAuth } from "../context/AuthContext";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase/config";
+
+// Fallback Courses for Dropdown when Firestore has 0 courses uploaded
+const FALLBACK_DROPDOWN_COURSES = [
+  {
+    id: "autism-asd-101",
+    title: "Understanding Autism Spectrum Disorder (ASD)",
+    category: "Autism / ADHD",
+  },
+  {
+    id: "speech-therapy-201",
+    title: "Speech Therapy: From Basics to Advanced",
+    category: "Speech Therapy",
+  },
+  {
+    id: "occupational-therapy-301",
+    title: "Occupational Therapy for Daily Living Skills",
+    category: "Occupational Therapy",
+  },
+  {
+    id: "behaviour-support-401",
+    title: "Positive Behaviour Support Techniques",
+    category: "Behaviour Therapy",
+  },
+  {
+    id: "special-education-501",
+    title: "Special Education: Inclusive Learning Strategies",
+    category: "Special Education",
+  },
+  {
+    id: "pediatric-rehab-601",
+    title: "Pediatric Rehabilitation Essentials",
+    category: "Pediatric Rehab",
+  },
+];
 
 const Navbar = () => {
-  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- Destructure userData for Role Detection ---
   const { currentUser, userData, logout } = useAuth();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState("login");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCoursesDropdownOpen, setIsCoursesDropdownOpen] = useState(false);
+  const [isMobileCoursesOpen, setIsMobileCoursesOpen] = useState(false);
+
+  const [coursesList, setCoursesList] = useState([]);
   const profileMenuRef = useRef(null);
 
-  // [UPDATED] Hardcoded Brand Colors (Partner logic removed)
-  const brandColor = "#0f172a";
-  const accentColor = "#5edff4";
+  const brandColor = "#0a2a59"; // Dark Blue
+  const accentYellow = "#facc15"; // Yellow
 
-  // --- [UPDATED] Logical Dashboard Paths ---
-  // If admin -> /admin, else (Student) -> /dashboard
   const isAdmin = userData?.role === "admin";
-
   let dashboardPath = "/dashboard";
   if (isAdmin) dashboardPath = "/admin";
 
   let profilePath = "/dashboard/profile";
   if (isAdmin) profilePath = "/admin/settings";
 
+  // Fetch real-time courses for Navbar dropdown (Only uploaded courses)
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+    const fetchDropdownCourses = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "courseVideos"));
+        const fetched = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCoursesList(fetched);
+      } catch (err) {
+        console.error("Error fetching courses for navbar:", err);
+        setCoursesList([]);
+      }
     };
+    fetchDropdownCourses();
+  }, []);
 
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (
         profileMenuRef.current &&
@@ -57,166 +103,184 @@ const Navbar = () => {
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
     document.addEventListener("mousedown", handleClickOutside);
-
     return () => {
-      window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  const openAuth = (mode) => {
-    setAuthMode(mode);
+  // Close mobile & dropdown menus on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setIsCoursesDropdownOpen(false);
+  }, [location.pathname]);
+
+  const openAuth = () => {
     setIsAuthOpen(true);
+    setIsMobileMenuOpen(false);
   };
 
   const handleLogout = async () => {
     try {
       await logout();
       setShowProfileMenu(false);
+      setIsMobileMenuOpen(false);
       navigate("/");
     } catch (error) {
       console.error("Failed to log out", error);
     }
   };
 
-  // --- [UPDATED] Added isPremium flag and Crown icon to Partnership ---
   const navLinks = [
-    { name: "Home", path: "/", icon: Home },
-    { name: "Courses", path: "/courses", icon: GraduationCap },
-    { name: "About Us", path: "/about", icon: Users },
-    { name: "Contact Us", path: "/contact", icon: Mail },
-    // Show Dashboard link only if logged in
-    ...(currentUser
-      ? [{ name: "Dashboard", path: dashboardPath, icon: LayoutDashboard }]
-      : []),
+    { name: "Home", path: "/" },
+    { name: "Courses", path: "/courses", hasDropdown: true },
+    { name: "Programs", path: "/programs" },
+    { name: "Our Experts", path: "/experts" },
+    { name: "About Us", path: "/about" },
+    { name: "Contact Us", path: "/contact" },
   ];
 
   return (
     <>
-      <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b
-        ${
-          scrolled
-            ? "bg-white/90 backdrop-blur-xl border-slate-200/50 py-2 shadow-lg shadow-slate-200/20"
-            : "bg-transparent py-2 sm:py-3 border-transparent"
-        }`}
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 shadow-md"
+        style={{ backgroundColor: brandColor }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-          {/* --- Logo Section --- */}
-          <NavLink to="/" className="flex items-center gap-2 group shrink-0">
-            <div
-              className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3 shadow-lg shrink-0"
-              style={{
-                backgroundColor: brandColor,
-                boxShadow: `0 4px 12px ${accentColor}33`,
-              }}
-            >
-              <GraduationCap
-                className="w-5 h-5"
-                style={{ color: accentColor }}
-              />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm sm:text-lg font-bold tracking-tight text-slate-900 leading-none">
-                REHABLITO ACADEMY
-              </span>
-              <span
-                className="text-[9px] sm:text-[10px] font-bold tracking-[0.2em] uppercase block"
-                style={{ color: accentColor }}
-              ></span>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between py-2 sm:py-3">
+
+          {/* --- Logo Section (Bigger Size) --- */}
+          <NavLink to="/" className="flex items-center shrink-0">
+            <img
+              src="https://ik.imagekit.io/5glnyqfxu/Courses/LogoRehab.webp"
+              alt="Rehablito Academy"
+              className="h-20 sm:h-24 lg:h-[5.5rem] w-auto object-contain transition-all"
+            />
           </NavLink>
 
           {/* --- Desktop Links --- */}
-          <div className="hidden lg:flex items-center bg-slate-100/50 backdrop-blur-sm px-1 py-1 rounded-full border border-slate-200/60">
-            {navLinks.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.path}
-                className={({ isActive }) =>
-                  `relative px-4 py-1.5 text-sm font-semibold rounded-full transition-all duration-300
-                  ${
-                    isActive
-                      ? "text-slate-900"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {/* --- [UPDATED] Premium Styling Logic for Desktop --- */}
-                    <span className="relative z-10 flex items-center gap-1.5">
-                      {item.isPremium && (
-                        <item.icon
-                          className={`w-4 h-4 ${isActive ? "text-amber-600" : "text-amber-500"} drop-shadow-sm`}
-                          fill="currentColor"
+          <div className="hidden lg:flex items-center gap-6">
+            {navLinks.map((item) => {
+              if (item.hasDropdown) {
+                return (
+                  <div
+                    key={item.name}
+                    className="relative py-2"
+                    onMouseEnter={() => setIsCoursesDropdownOpen(true)}
+                    onMouseLeave={() => setIsCoursesDropdownOpen(false)}
+                  >
+                    <NavLink
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `text-[15px] font-medium transition-colors flex items-center gap-1 cursor-pointer
+                        ${isActive || isCoursesDropdownOpen
+                          ? "text-[#facc15]"
+                          : "text-white hover:text-[#facc15]"
+                        }`
+                      }
+                    >
+                      <span>{item.name}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 mt-0.5 opacity-80 transition-transform duration-200 ${
+                          isCoursesDropdownOpen ? "rotate-180 text-[#facc15]" : ""
+                        }`}
+                      />
+                    </NavLink>
+
+                    {/* Transparent/Blur Courses Hover Dropdown Closer to Nav */}
+                    <AnimatePresence>
+                      {isCoursesDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 3 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 3 }}
+                          transition={{ duration: 0.12 }}
+                          className="absolute left-0 top-full pt-0.5 min-w-[240px] max-w-xs z-50"
+                        >
+                          <div className="bg-[#0a2a59]/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/10 py-1 text-white">
+                            {coursesList.length > 0 ? (
+                              coursesList.map((course) => (
+                                <Link
+                                  key={course.id}
+                                  to={`/courses/${course.id}`}
+                                  onClick={() => setIsCoursesDropdownOpen(false)}
+                                  className="block px-4 py-2 text-xs font-bold text-[#facc15] hover:text-white hover:bg-white/10 transition-colors cursor-pointer truncate"
+                                >
+                                  • {course.title}
+                                </Link>
+                              ))
+                            ) : (
+                              <div className="px-4 py-2 text-xs text-slate-300 font-semibold italic">
+                                No courses uploaded yet
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              }
+
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `relative py-2 text-[15px] font-medium transition-colors flex items-center gap-1
+                    ${isActive
+                      ? "text-[#facc15]"
+                      : "text-white hover:text-[#facc15]"
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span>{item.name}</span>
+                      {isActive && (
+                        <motion.div
+                          layoutId="nav-underline"
+                          className="absolute bottom-0 left-0 right-0 h-[2px]"
+                          style={{ backgroundColor: accentYellow }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 30,
+                          }}
                         />
                       )}
-                      <span
-                        className={
-                          item.isPremium
-                            ? `bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent font-bold ${isActive ? "from-amber-600 to-orange-600" : ""}`
-                            : ""
-                        }
-                      >
-                        {item.name}
-                      </span>
-                    </span>
-
-                    {isActive && (
-                      <motion.div
-                        layoutId="desktop-nav-bg"
-                        className="absolute inset-0 bg-white rounded-full shadow-sm border border-slate-200/50"
-                        transition={{
-                          type: "spring",
-                          bounce: 0.2,
-                          duration: 0.6,
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </NavLink>
-            ))}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
 
-          {/* --- Action Buttons --- */}
-          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+          {/* --- Action Buttons (Desktop & Hamburger Trigger) --- */}
+          <div className="flex items-center gap-3 shrink-0">
             {currentUser ? (
-              // Logged In State
               <div className="relative" ref={profileMenuRef}>
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-full hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+                  className="flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full border border-slate-600 hover:bg-white/10 transition-all cursor-pointer"
                 >
-                  <div
-                    className="size-8 rounded-full text-white flex items-center justify-center font-bold text-xs shadow-md border border-slate-200"
-                    style={{ backgroundColor: brandColor }}
-                  >
+                  <div className="size-6 sm:size-7 rounded-full bg-[#facc15] text-[#0a2a59] flex items-center justify-center font-bold text-xs">
                     {currentUser.displayName
                       ? currentUser.displayName[0].toUpperCase()
                       : "U"}
                   </div>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-xs font-bold text-slate-900 leading-none">
+                  <div className="hidden sm:block text-left text-white">
+                    <p className="text-sm font-medium leading-none">
                       {currentUser.displayName
                         ? currentUser.displayName.split(" ")[0]
                         : "User"}
                     </p>
                   </div>
                   <ChevronDown
-                    className={`size-4 text-slate-400 transition-transform duration-300 ${
-                      showProfileMenu ? "rotate-180" : ""
-                    }`}
+                    className={`size-4 text-white transition-transform duration-300 ${showProfileMenu ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
-                {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showProfileMenu && (
                     <motion.div
@@ -224,13 +288,13 @@ const Navbar = () => {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden py-2"
+                      className="absolute right-0 top-full mt-3 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden py-2 z-50 text-[#0F1B3D]"
                     >
-                      <div className="px-4 py-3 border-b border-slate-50 mb-1">
+                      <div className="px-4 py-3 border-b border-slate-100 mb-1">
                         <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
                           Signed in as
                         </p>
-                        <p className="text-sm font-bold text-slate-900 truncate">
+                        <p className="text-sm font-bold text-[#0a2a59] truncate">
                           {currentUser.email}
                         </p>
                       </div>
@@ -238,7 +302,7 @@ const Navbar = () => {
                       <Link
                         to={dashboardPath}
                         onClick={() => setShowProfileMenu(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-[#0a2a59] hover:bg-slate-50 transition-colors"
                       >
                         <LayoutDashboard className="size-4" />
                         Dashboard
@@ -247,18 +311,16 @@ const Navbar = () => {
                       <Link
                         to={profilePath}
                         onClick={() => setShowProfileMenu(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-[#0a2a59] hover:bg-slate-50 transition-colors"
                       >
                         <Settings className="size-4" />
                         Settings
                       </Link>
 
-                      {/* Reset Password Option */}
-
-                      <div className="border-t border-slate-50 mt-1 pt-1">
+                      <div className="border-t border-slate-100 mt-1 pt-1">
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors text-left"
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
                         >
                           <LogOut className="size-4" />
                           Sign Out
@@ -269,98 +331,123 @@ const Navbar = () => {
                 </AnimatePresence>
               </div>
             ) : (
-              // Logged Out State
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openAuth("login")}
-                  className="hidden sm:flex px-5 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  Log In
-                </button>
-                <button
-                  onClick={() => openAuth("signup")}
-                  className="px-5 py-2 text-sm font-bold text-white rounded-xl shadow-lg shadow-slate-200 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sign Up</span>
-                  <span className="sm:hidden">Join</span>
-                </button>
-              </div>
+              <button
+                onClick={openAuth}
+                className="hidden sm:flex px-5 py-1.5 sm:px-6 sm:py-2 text-sm font-medium text-white rounded-full items-center gap-2 transition-all hover:bg-[#facc15]/10 active:scale-95 border cursor-pointer"
+                style={{ borderColor: accentYellow }}
+              >
+                <User className="w-4 h-4" style={{ color: accentYellow }} />
+                <span>Login</span>
+              </button>
             )}
+
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 text-white hover:text-[#facc15] focus:outline-none cursor-pointer"
+              aria-label="Toggle Menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-7 h-7 text-[#facc15]" />
+              ) : (
+                <Menu className="w-7 h-7 text-white" />
+              )}
+            </button>
           </div>
         </div>
-      </motion.nav>
 
-      {/* --- Mobile Bottom Nav --- */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 lg:hidden pb-safe">
-        <div className="flex justify-around items-center px-2 py-3">
-          {navLinks.map((item) => {
-            const isActive = location.pathname === item.path;
-            // --- [UPDATED] Mobile Theme Color Logic ---
-            const themeColor = item.isPremium ? "#f59e0b" : accentColor; // Amber/Gold for Premium
+        {/* --- Mobile Dropdown Menu --- */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="lg:hidden bg-[#071f42] border-t border-slate-700/80 overflow-hidden px-4 py-4"
+            >
+              <div className="flex flex-col gap-2">
+                {navLinks.map((item) => {
+                  if (item.hasDropdown) {
+                    return (
+                      <div key={item.name} className="flex flex-col">
+                        <div className="flex items-center justify-between py-2 px-3 rounded-lg text-slate-200">
+                          <NavLink
+                            to={item.path}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="text-base font-medium hover:text-[#facc15]"
+                          >
+                            <span>{item.name}</span>
+                          </NavLink>
+                          <button
+                            onClick={() => setIsMobileCoursesOpen(!isMobileCoursesOpen)}
+                            className="p-1 text-slate-300 hover:text-[#facc15]"
+                          >
+                            <ChevronDown
+                              className={`w-5 h-5 transition-transform duration-200 ${
+                                isMobileCoursesOpen ? "rotate-180 text-[#facc15]" : ""
+                              }`}
+                            />
+                          </button>
+                        </div>
 
-            return (
-              <NavLink
-                key={item.name}
-                to={item.path}
-                className="flex flex-col items-center gap-1 p-1 relative"
-              >
-                <div className="relative">
-                  <motion.div
-                    animate={{
-                      scale: isActive ? 1.1 : 1,
-                      y: isActive ? -2 : 0,
-                    }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  >
-                    <item.icon
-                      className={`w-5 h-5 transition-colors duration-300 ${
-                        isActive
-                          ? "stroke-[2.5px]"
-                          : "text-slate-400 stroke-[1.5px]"
-                      }`}
-                      style={{
-                        color: isActive
-                          ? themeColor
-                          : item.isPremium
-                            ? "#fbbf24"
-                            : undefined,
-                      }}
-                      fill={item.isPremium ? "currentColor" : "none"}
-                    />
-                  </motion.div>
-                </div>
+                        {/* Mobile Sub-courses list */}
+                        {isMobileCoursesOpen && (
+                          <div className="pl-4 py-1 space-y-1.5 border-l-2 border-[#facc15]/40 ml-4 my-1">
+                            {coursesList.map((c) => (
+                              <Link
+                                key={c.id}
+                                to={`/courses/${c.id}`}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="block py-1.5 px-2 text-xs font-semibold text-slate-300 hover:text-[#facc15] truncate"
+                              >
+                                • {c.title}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
 
-                <span
-                  className={`text-[10px] mt-0.5 font-bold tracking-wide transition-colors duration-300 ${
-                    isActive ? "text-slate-900" : "text-slate-400"
-                  } ${item.isPremium && !isActive ? "!text-amber-500" : ""}`}
-                  style={{
-                    color: isActive && !item.isPremium ? themeColor : undefined,
-                  }}
-                >
-                  {item.name}
-                </span>
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `py-2 px-3 rounded-lg text-base font-medium transition-colors flex items-center justify-between
+                        ${isActive
+                          ? "text-[#facc15] bg-white/10 font-bold"
+                          : "text-slate-200 hover:text-[#facc15] hover:bg-white/5"
+                        }`
+                      }
+                    >
+                      <span>{item.name}</span>
+                    </NavLink>
+                  );
+                })}
 
-                {isActive && (
-                  <motion.div
-                    layoutId="mobile-dot"
-                    className="absolute -top-1 w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: themeColor }}
-                  />
+                {!currentUser && (
+                  <div className="pt-3 border-t border-slate-700/60 mt-2">
+                    <button
+                      onClick={openAuth}
+                      className="w-full py-2.5 px-4 text-center font-semibold text-[#0a2a59] bg-[#facc15] rounded-full shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Login / Register</span>
+                    </button>
+                  </div>
                 )}
-              </NavLink>
-            );
-          })}
-        </div>
-      </div>
-      <div className="h-16 lg:hidden" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
 
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        defaultMode={authMode}
+        defaultMode="login"
       />
     </>
   );

@@ -18,6 +18,8 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Courses from "./pages/Courses";
 import CourseDetails from "./pages/CourseDetails";
+import Programs from "./pages/Programs";
+import OurExperts from "./pages/OurExperts";
 import EBookDetails from "./pages/EBookDetails";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
@@ -124,6 +126,26 @@ const AppContent = () => {
             <>
               <Navbar />
               <CourseDetails />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/programs"
+          element={
+            <>
+              <Navbar />
+              <Programs />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/experts"
+          element={
+            <>
+              <Navbar />
+              <OurExperts />
               <Footer />
             </>
           }

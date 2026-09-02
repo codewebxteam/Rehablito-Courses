@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if current user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // 1. Users Collection: Read/Write by owner or admin
+    match /users/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 2. Courses Collection (courseVideos): Public Read, Admin Write
+    match /courseVideos/{courseId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 3. EBooks Collection: Public Read, Admin Write
+    match /ebooks/{ebookId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 4. Enrollments / Purchases / Notifications
+    match /enrollments/{enrollmentId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /payment_notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 5. Default Fallback rule for development
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

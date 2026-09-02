@@ -45,6 +45,8 @@ const CourseManager = () => {
   // Initial form state
   const initialFormState = {
     title: "",
+    category: "Autism / ADHD",
+    customCategory: "",
     description: "",
     syllabus: "",
     price: 299,
@@ -134,8 +136,22 @@ const CourseManager = () => {
       ];
     }
 
+    const presetCategories = [
+      "Autism / ADHD",
+      "Speech Therapy",
+      "Occupational Therapy",
+      "Behaviour Therapy",
+      "Special Education",
+      "Pediatric Rehabilitation",
+    ];
+
+    const courseCategory = course.category || "Autism / ADHD";
+    const isPreset = presetCategories.includes(courseCategory);
+
     setFormData({
       title: course.title || "",
+      category: isPreset ? courseCategory : "Custom",
+      customCategory: isPreset ? "" : courseCategory,
       description: course.description || "",
       syllabus: course.syllabus || "",
       price: course.price || 299,
@@ -217,9 +233,14 @@ const CourseManager = () => {
       const firstVid = formData.lectures[0];
       const thumbUrl = `https://img.youtube.com/vi/${firstVid.videoId}/maxresdefault.jpg`;
       const introId = extractVideoId(formData.introVideoUrl);
+      const finalCategory =
+        formData.category === "Custom"
+          ? formData.customCategory || "General"
+          : formData.category;
 
       const courseData = {
         title: formData.title,
+        category: finalCategory,
         description: formData.description,
         syllabus: formData.syllabus,
         lectures: formData.lectures,
@@ -535,7 +556,7 @@ const CourseManager = () => {
                           <input
                             autoFocus
                             type="text"
-                            placeholder="e.g. Master React JS"
+                            placeholder="e.g. Speech Therapy & Communication Guide"
                             className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-900"
                             value={formData.title}
                             onChange={(e) =>
@@ -545,6 +566,53 @@ const CourseManager = () => {
                               })
                             }
                           />
+                        </div>
+
+                        {/* [NEW] Therapy Category Selector & Custom Input */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                              Course Category *
+                            </label>
+                            <select
+                              className="w-full bg-slate-50 p-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-900 cursor-pointer"
+                              value={formData.category}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  category: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="Autism / ADHD">Autism / ADHD</option>
+                              <option value="Speech Therapy">Speech Therapy</option>
+                              <option value="Occupational Therapy">Occupational Therapy</option>
+                              <option value="Behaviour Therapy">Behaviour Therapy</option>
+                              <option value="Special Education">Special Education</option>
+                              <option value="Pediatric Rehabilitation">Pediatric Rehabilitation</option>
+                              <option value="Custom">Custom Category (Type below)...</option>
+                            </select>
+                          </div>
+
+                          {formData.category === "Custom" && (
+                            <div>
+                              <label className="text-xs font-bold text-indigo-600 uppercase mb-1 block">
+                                Custom Category Name *
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Music Therapy"
+                                className="w-full bg-indigo-50 p-3 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-bold text-indigo-900"
+                                value={formData.customCategory}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    customCategory: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                          )}
                         </div>
 
                         <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">

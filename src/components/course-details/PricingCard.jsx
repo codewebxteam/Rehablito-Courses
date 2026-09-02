@@ -10,6 +10,7 @@ import {
   Loader2,
   Clock,
   RefreshCcw,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -33,11 +34,8 @@ const PricingCard = ({ course, isEnrolled }) => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Status State: 'idle', 'pending', 'approved'
   const [paymentStatus, setPaymentStatus] = useState("idle");
 
-  // Check if user has already sent a notification for THIS course
   useEffect(() => {
     if (!currentUser || !course) return;
 
@@ -45,7 +43,7 @@ const PricingCard = ({ course, isEnrolled }) => {
       collection(db, "payment_notifications"),
       where("userId", "==", currentUser.uid),
       where("courseId", "==", course.id),
-      where("status", "==", "pending"),
+      where("status", "==", "pending")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -59,7 +57,6 @@ const PricingCard = ({ course, isEnrolled }) => {
     return () => unsubscribe();
   }, [currentUser, course]);
 
-  // [CRITICAL UPDATE] Handle User Data Sync and Redirection
   useEffect(() => {
     const handleRedirectionAndSync = async () => {
       const pendingCourseJSON = localStorage.getItem("pendingCheckoutCourse");
@@ -67,7 +64,6 @@ const PricingCard = ({ course, isEnrolled }) => {
       if (currentUser && pendingCourseJSON) {
         const pendingCourse = JSON.parse(pendingCourseJSON);
 
-        // Match only if the current course matches the intended one
         if (pendingCourse.id === course.id) {
           setIsSyncing(true);
 
@@ -75,11 +71,10 @@ const PricingCard = ({ course, isEnrolled }) => {
             const userRef = doc(db, "users", currentUser.uid);
             const userSnap = await getDoc(userRef);
 
-            // Agar user database mein nahi hai, toh uska profile create karein
             if (!userSnap.exists()) {
               await setDoc(userRef, {
                 uid: currentUser.uid,
-                name: currentUser.displayName || "Student",
+                name: currentUser.displayName || "Parent / Caregiver",
                 email: currentUser.email,
                 photoURL: currentUser.photoURL || "",
                 role: "student",
@@ -89,11 +84,10 @@ const PricingCard = ({ course, isEnrolled }) => {
                 purchasedBooks: [],
                 phone: currentUser.phoneNumber || "",
                 interestedCourse: pendingCourse?.title || "None",
-                registrationSource: "PricingCard_BuyNow",
+                registrationSource: "PricingCard_EnrollNow",
               });
             }
 
-            // Small delay to ensure Firestore write completes before redirect
             setTimeout(() => {
               localStorage.removeItem("pendingCheckoutCourse");
               setIsSyncing(false);
@@ -107,7 +101,6 @@ const PricingCard = ({ course, isEnrolled }) => {
           } catch (error) {
             console.error("Error during sync:", error);
             setIsSyncing(false);
-            // Fallback: Proceed to payment even if sync fails
             if (pendingCourse.paymentLink)
               window.location.href = pendingCourse.paymentLink;
           }
@@ -118,13 +111,12 @@ const PricingCard = ({ course, isEnrolled }) => {
     handleRedirectionAndSync();
   }, [currentUser, course.id, navigate]);
 
-  // Helper: Format Currency
   const formatCurrency = (amount) => {
-    if (!amount) return "Free";
+    if (!amount) return "Free Access";
     const strAmount = String(amount).toLowerCase();
-    if (strAmount === "free" || strAmount === "0") return "Free";
+    if (strAmount === "free" || strAmount === "0") return "Free Access";
     const numericValue = parseInt(String(amount).replace(/[^0-9]/g, ""));
-    if (isNaN(numericValue) || numericValue === 0) return "Free";
+    if (isNaN(numericValue) || numericValue === 0) return "Free Access";
     return `₹${numericValue.toLocaleString("en-IN")}`;
   };
 
@@ -132,7 +124,7 @@ const PricingCard = ({ course, isEnrolled }) => {
   const displayOriginalPrice = formatCurrency(course.originalPrice);
 
   const handleBuyClick = () => {
-    if (!course?.paymentLink && displayPrice !== "Free") {
+    if (!course?.paymentLink && displayPrice !== "Free Access") {
       alert("Payment link is not configured. Please contact support.");
       return;
     }
@@ -154,7 +146,7 @@ const PricingCard = ({ course, isEnrolled }) => {
     }
 
     const confirmPay = window.confirm(
-      "Did you complete the payment successfully?",
+      "Did you complete the payment successfully?"
     );
     if (!confirmPay) return;
 
@@ -180,109 +172,109 @@ const PricingCard = ({ course, isEnrolled }) => {
   };
 
   return (
-    <div className="lg:absolute lg:-top-80 lg:right-0 w-full lg:w-95">
+    <div className="lg:absolute lg:-top-80 lg:right-0 w-full lg:w-[380px]">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl shadow-2xl shadow-slate-900/10 border border-slate-100 overflow-hidden sticky top-24"
+        className="bg-white rounded-3xl shadow-xl border border-slate-200/90 overflow-hidden sticky top-28"
       >
-        <div className="relative h-48 bg-slate-900 group cursor-pointer overflow-hidden">
+        {/* Course Preview Thumbnail */}
+        <div className="relative h-48 sm:h-52 bg-[#0F1B3D] group cursor-pointer overflow-hidden">
           <img
             src={course.image || course.thumbnail}
-            alt="preview"
-            className="size-full object-cover opacity-60 group-hover:opacity-40 transition-opacity"
+            alt="course preview"
+            className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity"
           />
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="size-14 bg-white rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <PlayCircle className="size-6 text-slate-900 ml-1" />
+            <div className="w-14 h-14 bg-white/95 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+              <PlayCircle className="w-7 h-7 text-[#0F1B3D] translate-x-[1px]" />
             </div>
           </div>
         </div>
 
-        <div className="p-8">
+        <div className="p-6 sm:p-7">
           {isSyncing ? (
             <div className="py-6 text-center space-y-4">
-              <div className="relative flex justify-center">
-                <RefreshCcw className="size-10 text-[#5edff4] animate-spin" />
-              </div>
-              <p className="font-black text-slate-800">
-                Setting up your profile...
+              <RefreshCcw className="w-10 h-10 text-[#0F1B3D] animate-spin mx-auto" />
+              <p className="font-extrabold text-[#0F1B3D]">
+                Setting up your access...
               </p>
-              <p className="text-xs text-slate-500">
-                Redirecting to payment securely.
+              <p className="text-xs text-slate-500 font-semibold">
+                Redirecting to secure payment.
               </p>
             </div>
           ) : isEnrolled ? (
             <>
-              <div className="mb-6 flex items-center gap-3 text-emerald-600 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                <CheckCircle className="size-6 shrink-0" />
+              <div className="mb-6 flex items-center gap-3 text-emerald-700 bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                <CheckCircle className="w-6 h-6 shrink-0 text-emerald-600" />
                 <div>
-                  <span className="font-black text-lg block leading-none mb-1">
-                    You own this course
+                  <span className="font-extrabold text-base block leading-none mb-1">
+                    You have access to this course
                   </span>
-                  <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">
-                    Ready to watch
+                  <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+                    Ready to Watch
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => navigate("/dashboard/my-courses")}
-                className="w-full py-4 text-white font-bold text-lg rounded-xl shadow-lg bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2 mb-4 cursor-pointer"
+                className="w-full py-3.5 text-white font-bold text-sm rounded-full shadow-lg bg-[#63DA6B] hover:bg-[#52c85a] flex items-center justify-center gap-2 mb-4 cursor-pointer transition-all"
               >
                 Go to Dashboard
               </button>
             </>
           ) : paymentStatus === "pending" ? (
             <>
-              <div className="mb-6 flex items-center gap-3 text-orange-600 bg-orange-50 p-4 rounded-xl border border-orange-100">
-                <Clock className="size-6 shrink-0 animate-pulse" />
+              <div className="mb-6 flex items-center gap-3 text-amber-700 bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                <Clock className="w-6 h-6 shrink-0 animate-pulse text-amber-600" />
                 <div>
-                  <span className="font-black text-lg block leading-none mb-1">
+                  <span className="font-extrabold text-base block leading-none mb-1">
                     Verification Pending
                   </span>
-                  <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">
-                    Admin is checking
+                  <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">
+                    Admin is reviewing
                   </span>
                 </div>
               </div>
               <button
                 disabled
-                className="w-full py-4 bg-slate-100 text-slate-400 font-bold text-lg rounded-xl flex items-center justify-center gap-2 mb-4"
+                className="w-full py-3.5 bg-slate-100 text-slate-400 font-bold text-sm rounded-full flex items-center justify-center gap-2 mb-4"
               >
-                <Loader2 className="size-5 animate-spin" /> Waiting for
-                Approval...
+                <Loader2 className="w-4 h-4 animate-spin" /> Waiting for Approval...
               </button>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3 mb-6 flex-wrap">
-                <span className="text-4xl font-black text-slate-900">
-                  {displayPrice}
-                </span>
-                {displayOriginalPrice !== displayPrice && (
-                  <span className="text-lg text-slate-400 line-through">
-                    {displayOriginalPrice}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <span className="text-3xl font-extrabold text-[#0F1B3D]">
+                    {displayPrice}
                   </span>
-                )}
+                  {displayOriginalPrice !== displayPrice && (
+                    <span className="text-sm text-slate-400 line-through ml-2">
+                      {displayOriginalPrice}
+                    </span>
+                  )}
+                </div>
               </div>
+
               <button
                 onClick={handleBuyClick}
-                className="w-full py-4 text-slate-900 font-bold text-lg rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer mb-3"
-                style={{ backgroundColor: "#5edff4" }}
+                className="w-full py-3.5 text-white font-bold text-sm rounded-full bg-[#0F1B3D] hover:bg-[#1c2e5e] transition-all shadow-lg active:scale-95 cursor-pointer mb-3"
               >
-                {displayPrice === "Free" ? "Enroll for Free" : "Buy Now"}
+                {displayPrice === "Free Access" ? "Enroll for Free" : "Enroll Now"}
               </button>
 
-              {displayPrice !== "Free" && (
+              {displayPrice !== "Free Access" && (
                 <button
                   onClick={handleNotifyAdmin}
                   disabled={notifyLoading}
-                  className="w-full py-3 bg-slate-50 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
+                  className="w-full py-2.5 bg-slate-50 text-slate-700 font-bold text-xs rounded-full hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
                 >
                   {notifyLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <BellRing className="size-4" />
+                    <BellRing className="w-4 h-4 text-[#0F1B3D]" />
                   )}
                   {notifyLoading ? "Sending Request..." : "I have already paid"}
                 </button>
@@ -290,13 +282,13 @@ const PricingCard = ({ course, isEnrolled }) => {
             </>
           )}
 
-          <div className="space-y-4 mt-6">
-            <h4 className="font-bold text-slate-900 text-sm">
+          <div className="space-y-3 mt-6 pt-5 border-t border-slate-100">
+            <h4 className="font-bold text-[#0F1B3D] text-xs uppercase tracking-wider">
               This course includes:
             </h4>
-            <FeatureItem icon={Smartphone} text="Access on mobile and Laptop" />
-            <FeatureItem icon={Trophy} text="Certificate of completion" />
-            <FeatureItem icon={ShieldCheck} text="Expert Q&A Support" />
+            <FeatureItem icon={Smartphone} text="Access on Mobile & Laptop" />
+            <FeatureItem icon={Trophy} text="Certificate of Completion" />
+            <FeatureItem icon={ShieldCheck} text="Certified Therapist Q&A Support" />
           </div>
         </div>
       </motion.div>
@@ -311,8 +303,8 @@ const PricingCard = ({ course, isEnrolled }) => {
 };
 
 const FeatureItem = ({ icon: Icon, text }) => (
-  <div className="flex items-center gap-3 text-sm text-slate-600">
-    <Icon className="size-4 text-slate-400" />
+  <div className="flex items-center gap-2.5 text-xs font-semibold text-slate-600">
+    <Icon className="w-4 h-4 text-[#0F1B3D]" />
     <span>{text}</span>
   </div>
 );
