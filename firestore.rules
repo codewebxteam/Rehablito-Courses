@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function: Check if user is an Admin
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Helper function: Check if requesting user owns the consultation thread
+    function isThreadOwner(threadId) {
+      return isAuthenticated() && (
+        threadId == ('user_' + request.auth.uid) ||
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == request.auth.uid
+      );
+    }
+
+    // --- USERS COLLECTION ---
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- ORDERS COLLECTION ---
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.studentEmail == request.auth.token.email ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- ENROLLED COURSES COLLECTION ---
+    match /enrolledCourses/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- CONSULTATION THREADS (USER ISOLATION: USER A CANNOT READ USER B'S THREAD) ---
+    match /consultation_threads/{threadId} {
+      // Only the thread owner (user_{uid}) or an Admin can read or write the consultation thread
+      allow read, write: if isAdmin() || isThreadOwner(threadId);
+
+      // Subcollection of messages inside consultation thread
+      match /messages/{messageId} {
+        allow read, write: if isAdmin() || threadId == ('user_' + request.auth.uid);
+      }
+    }
+
+    // --- PUBLIC / GENERAL CONTENT ---
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /ebooks/{ebookId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

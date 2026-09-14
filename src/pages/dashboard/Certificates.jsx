@@ -25,7 +25,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import jsPDF from "jspdf";
-import impactLogo from "../../assets/impact-logo.png";
+import rehablitoLogo from "../../assets/rehablito-logo.png";
 
 const Certificates = () => {
   const { enrolledCourses } = useCourse();
@@ -173,8 +173,7 @@ const CertificateItem = ({ courseData }) => {
     const centerX = width / 2;
 
     const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.src = "https://ik.imagekit.io/5glnyqfxu/Courses/LogoRehab.webp";
+    img.src = rehablitoLogo;
 
     img.onload = () => {
       doc.setFillColor(255, 255, 255);
@@ -194,8 +193,9 @@ const CertificateItem = ({ courseData }) => {
       doc.triangle(10, height - 10, 10 + cS, height - 10, 10, height - (10 + cS), "F");
       doc.triangle(width - 10, height - 10, width - (10 + cS), height - 10, width - 10, height - (10 + cS), "F");
 
-      const logoSize = 30;
-      doc.addImage(img, "PNG", centerX - logoSize / 2, 20, logoSize, logoSize, undefined, "FAST");
+      const logoWidth = 56;
+      const logoHeight = 28;
+      doc.addImage(img, "PNG", centerX - logoWidth / 2, 18, logoWidth, logoHeight, undefined, "FAST");
 
       doc.setTextColor(100, 110, 120);
       doc.setFontSize(8);
@@ -278,7 +278,7 @@ const CertificateItem = ({ courseData }) => {
     };
 
     img.onerror = () => {
-      alert("Logo Error! Please check src/assets/impact-logo.png");
+      alert("Logo Error! Please check src/assets/rehablito-logo.png");
       setDownloading(false);
     };
   };

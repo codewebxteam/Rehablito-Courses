@@ -134,6 +134,7 @@ const Navbar = () => {
   const navLinks = [
     { name: "Home", path: "/" },
     { name: "Courses", path: "/courses", hasDropdown: true },
+    { name: "Chat with Experts", path: "/chat", isChat: true },
     { name: "Programs", path: "/programs" },
     { name: "Our Experts", path: "/experts" },
     { name: "About Us", path: "/about" },

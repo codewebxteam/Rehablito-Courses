@@ -24,6 +24,8 @@ import EBookDetails from "./pages/EBookDetails";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
 import VerifyCertificate from "./pages/VerifyCertificate";
+import ConsultationChat from "./pages/ConsultationChat";
+import FloatingChatButton from "./components/FloatingChatButton";
 
 // --- Dashboard (Student) ---
 import DashboardLayout from "./components/dashboard/DashboardLayout";
@@ -43,6 +45,7 @@ import SalesManager from "./pages/Admin/SalesManager";
 import CourseManager from "./pages/Admin/CourseManager";
 import EBookManager from "./pages/Admin/EBookManager";
 import UserAccessManager from "./pages/Admin/UserAccessManager";
+import TherapistChatManager from "./pages/Admin/TherapistChatManager";
 
 // --- Scroll Helper ---
 const ScrollToTop = () => {
@@ -97,6 +100,7 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
+      <FloatingChatButton />
 
       <Routes>
         {/* --- PUBLIC ROUTES --- */}
@@ -182,6 +186,15 @@ const AppContent = () => {
           }
         />
         <Route path="/verify" element={<VerifyCertificate />} />
+        <Route
+          path="/chat"
+          element={
+            <>
+              <Navbar />
+              <ConsultationChat />
+            </>
+          }
+        />
 
         {/* --- ADMIN DASHBOARD ROUTES --- */}
         <Route
@@ -198,6 +211,7 @@ const AppContent = () => {
           <Route path="courses" element={<CourseManager />} />
           <Route path="ebooks" element={<EBookManager />} />
           <Route path="users" element={<UserAccessManager />} />
+          <Route path="chat" element={<TherapistChatManager />} />
         </Route>
 
         {/* --- STUDENT DASHBOARD ROUTES --- */}
@@ -214,6 +228,7 @@ const AppContent = () => {
           <Route path="ebooks" element={<EBookLibrary />} />
           <Route path="progress" element={<ProgressReport />} />
           <Route path="explore" element={<ExploreCourses />} />
+          <Route path="chat" element={<ConsultationChat isDashboard={true} />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="profile" element={<Profile />} />
         </Route>

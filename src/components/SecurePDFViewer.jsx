@@ -9,7 +9,21 @@ import {
   EyeOff,
   AlertTriangle,
 } from "lucide-react";
-import { generateSecureURL } from "../services/bunnyService";
+
+const getEmbedUrl = (url) => {
+  if (!url) return "";
+  try {
+    if (url.includes("drive.google.com")) {
+      let id = "";
+      if (url.includes("/file/d/")) id = url.split("/file/d/")[1].split("/")[0];
+      else if (url.includes("id=")) id = url.split("id=")[1].split("&")[0];
+      if (id) return `https://drive.google.com/file/d/${id}/preview`;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return url;
+};
 
 const SecurePDFViewer = ({ book, onClose }) => {
   const [scale, setScale] = useState(1.2);
@@ -17,13 +31,12 @@ const SecurePDFViewer = ({ book, onClose }) => {
   const [securityWarning, setSecurityWarning] = useState(false);
   const [secureUrl, setSecureUrl] = useState(null);
 
-  // Generate secure URL
+  // Generate URL
   useEffect(() => {
-    if (book.pdfUrl) {
-      const url = generateSecureURL(book.pdfUrl, 3600);
-      setSecureUrl(url);
+    if (book?.driveLink || book?.pdfUrl) {
+      setSecureUrl(getEmbedUrl(book.driveLink || book.pdfUrl));
     }
-  }, [book.pdfUrl]);
+  }, [book]);
 
   // Security Logic (Blur on focus loss, prevent screenshots)
   useEffect(() => {

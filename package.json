@@ -1,5 +1,5 @@
 {
-  "name": "impact-school-of-ai",
+  "name": "rehablito-courses",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -22,6 +22,7 @@
     "react-dom": "^19.2.0",
     "react-fast-marquee": "^1.6.5",
     "react-is": "^19.2.3",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.11.0",
     "recharts": "^3.6.0",
     "tailwind-merge": "^3.4.0",

@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Heart,
   Sparkles,
+  MessageSquareHeart,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -46,6 +47,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: PlayCircle, label: "My Learning", path: "/dashboard/my-courses" },
+    { icon: MessageSquareHeart, label: "Chat with Experts", path: "/dashboard/chat" },
     { icon: ShoppingCart, label: "Explore Courses", path: "/dashboard/explore" },
     { icon: Award, label: "Certificates", path: "/dashboard/certificates" },
   ];

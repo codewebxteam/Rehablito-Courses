@@ -19,6 +19,7 @@ import {
   Loader2,
   Unlock,
   DollarSign,
+  MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
@@ -45,6 +46,7 @@ const AdminLayout = () => {
 
   const navItems = [
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
+    { label: "Therapist Chat", path: "/admin/chat", icon: MessageSquare },
     { label: "Students", path: "/admin/students", icon: Users },
     { label: "Sales", path: "/admin/sales", icon: TrendingUp },
     { label: "Courses", path: "/admin/courses", icon: GraduationCap },
@@ -189,8 +191,20 @@ const AdminLayout = () => {
           </button>
         </div>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10 pb-24 custom-scrollbar bg-slate-50">
-          <div className="max-w-7xl mx-auto">
+        <main
+          className={`flex-1 ${
+            location.pathname.startsWith("/admin/chat")
+              ? "overflow-hidden p-0 bg-slate-100"
+              : "overflow-y-auto p-4 sm:p-6 lg:p-10 pb-24 custom-scrollbar bg-slate-50"
+          }`}
+        >
+          <div
+            className={
+              location.pathname.startsWith("/admin/chat")
+                ? "h-full w-full"
+                : "max-w-7xl mx-auto"
+            }
+          >
             {/* Yaha aapka current page load hoga refresh ke baad bhi */}
             <Outlet />
           </div>

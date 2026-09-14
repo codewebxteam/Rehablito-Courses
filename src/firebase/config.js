@@ -5,7 +5,7 @@ import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 
 /**
- * Project: Impact School AI
+ * Project: Rehablito Courses
  */
 
 const firebaseConfig = {
