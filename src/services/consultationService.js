@@ -16,7 +16,11 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebase/config";
-import { uploadToImageKit } from "./imagekitService";
+import {
+  uploadToImageKit,
+  deleteFromImageKit,
+  deleteMultipleFromImageKit,
+} from "./imagekitService";
 
 const THREADS_COLLECTION = "consultation_threads";
 
@@ -170,8 +174,11 @@ export const uploadAttachmentFile = async (file, userId = "anonymous") => {
       `/consultations/${userId}`
     );
     if (ikResult && ikResult.url) {
-      console.log("ImageKit upload successful:", ikResult.url);
-      return ikResult.url;
+      console.log("ImageKit upload successful:", ikResult.url, "fileId:", ikResult.fileId);
+      return {
+        url: ikResult.url,
+        fileId: ikResult.fileId || null,
+      };
     }
   } catch (ikErr) {
     console.warn("ImageKit upload failed, trying Firebase Storage fallback:", ikErr);
@@ -184,14 +191,20 @@ export const uploadAttachmentFile = async (file, userId = "anonymous") => {
       const storageRef = ref(storage, `consultations/${userId}/${timestamp}_${cleanName}`);
       const snapshot = await uploadBytes(storageRef, uploadTarget);
       const downloadUrl = await getDownloadURL(snapshot.ref);
-      return downloadUrl;
+      return {
+        url: downloadUrl,
+        fileId: null,
+      };
     }
   } catch (fbErr) {
     console.warn("Firebase storage fallback failed:", fbErr);
   }
 
   // 3. Graceful fallback to dataUrl
-  return file.dataUrl || "";
+  return {
+    url: file.dataUrl || "",
+    fileId: null,
+  };
 };
 
 // Module-level in-memory cache for instant SPA page switching
@@ -412,6 +425,7 @@ export const sendUserConsultationMessage = async ({
       type: a.type, // 'image', 'pdf', 'audio'
       name: a.name,
       url: a.url || a.dataUrl || "",
+      fileId: a.fileId || null,
       dataUrl: a.dataUrl || a.url || "",
       duration: a.duration || null,
     })),
@@ -456,7 +470,9 @@ export const sendTherapistConsultationReply = async ({
       type: a.type,
       name: a.name,
       url: a.url || a.dataUrl || "",
+      fileId: a.fileId || null,
       dataUrl: a.dataUrl || a.url || "",
+      duration: a.duration || null,
     })),
     ...(replyTo && {
       replyTo: {
@@ -545,12 +561,32 @@ export const updateConsultationStatus = async (threadId, status) => {
 
 /**
  * Clear all messages in a consultation thread (with confirmation)
+ * Permanently deletes all media files from ImageKit and records from Firestore
  */
 export const clearConsultationMessages = async (threadId) => {
   if (!threadId) return;
   try {
     const messagesRef = collection(db, THREADS_COLLECTION, threadId, "messages");
     const snaps = await getDocs(messagesRef);
+
+    // 1. Collect all ImageKit fileIds from attachments to permanently delete them
+    const fileIdsToDelete = [];
+    snaps.docs.forEach((d) => {
+      const data = d.data();
+      if (Array.isArray(data.attachments)) {
+        data.attachments.forEach((att) => {
+          if (att.fileId) fileIdsToDelete.push(att.fileId);
+        });
+      }
+    });
+
+    // 2. Permanently delete media from ImageKit
+    if (fileIdsToDelete.length > 0) {
+      console.log(`[ClearChat] Permanently deleting ${fileIdsToDelete.length} files from ImageKit...`);
+      await deleteMultipleFromImageKit(fileIdsToDelete);
+    }
+
+    // 3. Permanently delete Firestore message documents
     const deletePromises = snaps.docs.map((d) => deleteDoc(d.ref));
     await Promise.all(deletePromises);
 
@@ -573,3 +609,81 @@ export const clearConsultationMessages = async (threadId) => {
     throw err;
   }
 };
+
+/**
+ * 7-Day Auto-Cleanup: Automatically deletes consultation messages and attachments
+ * older than 7 days (1 week) permanently from:
+ * 1. ImageKit CDN storage (photos, parchi, pdfs)
+ * 2. Firestore database (messages collection)
+ * @param {number} retentionDays - Number of days to retain (default: 7)
+ * @returns {Promise<{ deletedMessages: number, deletedFiles: number }>}
+ */
+export const autoCleanupExpiredConsultations = async (retentionDays = 7) => {
+  try {
+    const now = Date.now();
+    const cutoffDate = new Date(now - retentionDays * 24 * 60 * 60 * 1000);
+    console.log(`[AutoCleanup] Checking for consultation messages older than ${retentionDays} days (before ${cutoffDate.toISOString()})...`);
+
+    const threadsSnap = await getDocs(collection(db, THREADS_COLLECTION));
+    let totalDeletedMessages = 0;
+    const allFileIdsToDelete = [];
+
+    for (const threadDoc of threadsSnap.docs) {
+      const threadId = threadDoc.id;
+      const messagesRef = collection(db, THREADS_COLLECTION, threadId, "messages");
+
+      const expiredQuery = query(
+        messagesRef,
+        where("createdAt", "<=", cutoffDate)
+      );
+      const expiredSnap = await getDocs(expiredQuery);
+
+      if (!expiredSnap.empty) {
+        console.log(`[AutoCleanup] Thread ${threadId} has ${expiredSnap.size} expired messages.`);
+        const deleteDocPromises = [];
+
+        expiredSnap.forEach((msgDoc) => {
+          const msgData = msgDoc.data();
+          if (Array.isArray(msgData.attachments)) {
+            msgData.attachments.forEach((att) => {
+              if (att.fileId) {
+                allFileIdsToDelete.push(att.fileId);
+              }
+            });
+          }
+          deleteDocPromises.push(deleteDoc(msgDoc.ref));
+        });
+
+        await Promise.all(deleteDocPromises);
+        totalDeletedMessages += expiredSnap.size;
+
+        // If thread has no remaining messages, update thread summary
+        const remainingSnap = await getDocs(messagesRef);
+        if (remainingSnap.empty) {
+          await updateDoc(threadDoc.ref, {
+            lastMessage: "Messages older than 7 days were automatically cleared.",
+            status: "pending",
+            unreadAdminCount: 0,
+            unreadUserCount: 0,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    // Permanently delete from ImageKit
+    let deletedFiles = 0;
+    if (allFileIdsToDelete.length > 0) {
+      console.log(`[AutoCleanup] Permanently deleting ${allFileIdsToDelete.length} expired files from ImageKit...`);
+      const res = await deleteMultipleFromImageKit(allFileIdsToDelete);
+      deletedFiles = res.deleted;
+    }
+
+    console.log(`[AutoCleanup] Completed: ${totalDeletedMessages} messages and ${deletedFiles} ImageKit files purged.`);
+    return { deletedMessages: totalDeletedMessages, deletedFiles };
+  } catch (err) {
+    console.error("[AutoCleanup] Error running consultation auto-cleanup:", err);
+    return { deletedMessages: 0, deletedFiles: 0, error: err.message };
+  }
+};
+

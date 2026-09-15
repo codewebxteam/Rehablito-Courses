@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -6,46 +6,56 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
 import { EBookProvider } from "./context/EBookContext";
 import { CourseProvider } from "./context/CourseContext";
 
-// --- Components ---
+// --- Components (Always loaded — used on every page) ---
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-
-// --- Public Pages ---
-import Home from "./pages/Home";
-import Courses from "./pages/Courses";
-import CourseDetails from "./pages/CourseDetails";
-import Programs from "./pages/Programs";
-import OurExperts from "./pages/OurExperts";
-import EBookDetails from "./pages/EBookDetails";
-import AboutUs from "./pages/AboutUs";
-import ContactUs from "./pages/ContactUs";
-import VerifyCertificate from "./pages/VerifyCertificate";
-import ConsultationChat from "./pages/ConsultationChat";
 import FloatingChatButton from "./components/FloatingChatButton";
 
-// --- Dashboard (Student) ---
-import DashboardLayout from "./components/dashboard/DashboardLayout";
-import StudentDashboard from "./pages/dashboard/StudentDashboard";
-import MyCourses from "./pages/dashboard/MyCourses";
-import EBookLibrary from "./pages/dashboard/EBookLibrary";
-import ProgressReport from "./pages/dashboard/ProgressReport";
-import ExploreCourses from "./pages/dashboard/ExploreCourses";
-import Certificates from "./pages/dashboard/Certificates";
-import Profile from "./pages/dashboard/Profile";
+// --- Lazy-loaded Public Pages ---
+const Home = React.lazy(() => import("./pages/Home"));
+const Courses = React.lazy(() => import("./pages/Courses"));
+const CourseDetails = React.lazy(() => import("./pages/CourseDetails"));
+const Programs = React.lazy(() => import("./pages/Programs"));
+const OurExperts = React.lazy(() => import("./pages/OurExperts"));
+const EBookDetails = React.lazy(() => import("./pages/EBookDetails"));
+const AboutUs = React.lazy(() => import("./pages/AboutUs"));
+const ContactUs = React.lazy(() => import("./pages/ContactUs"));
+const VerifyCertificate = React.lazy(() => import("./pages/VerifyCertificate"));
+const ConsultationChat = React.lazy(() => import("./pages/ConsultationChat"));
 
-// --- Admin Pages ---
-import AdminLayout from "./pages/Admin/AdminLayout";
-import IntelligenceHub from "./pages/Admin/IntelligenceHub";
-import StudentData from "./pages/Admin/StudentData";
-import SalesManager from "./pages/Admin/SalesManager";
-import CourseManager from "./pages/Admin/CourseManager";
-import EBookManager from "./pages/Admin/EBookManager";
-import UserAccessManager from "./pages/Admin/UserAccessManager";
-import TherapistChatManager from "./pages/Admin/TherapistChatManager";
+// --- Lazy-loaded Dashboard (Student) ---
+const DashboardLayout = React.lazy(() => import("./components/dashboard/DashboardLayout"));
+const StudentDashboard = React.lazy(() => import("./pages/dashboard/StudentDashboard"));
+const MyCourses = React.lazy(() => import("./pages/dashboard/MyCourses"));
+const EBookLibrary = React.lazy(() => import("./pages/dashboard/EBookLibrary"));
+const ProgressReport = React.lazy(() => import("./pages/dashboard/ProgressReport"));
+const ExploreCourses = React.lazy(() => import("./pages/dashboard/ExploreCourses"));
+const Certificates = React.lazy(() => import("./pages/dashboard/Certificates"));
+const Profile = React.lazy(() => import("./pages/dashboard/Profile"));
+
+// --- Lazy-loaded Admin Pages ---
+const AdminLayout = React.lazy(() => import("./pages/Admin/AdminLayout"));
+const IntelligenceHub = React.lazy(() => import("./pages/Admin/IntelligenceHub"));
+const StudentData = React.lazy(() => import("./pages/Admin/StudentData"));
+const SalesManager = React.lazy(() => import("./pages/Admin/SalesManager"));
+const CourseManager = React.lazy(() => import("./pages/Admin/CourseManager"));
+const EBookManager = React.lazy(() => import("./pages/Admin/EBookManager"));
+const UserAccessManager = React.lazy(() => import("./pages/Admin/UserAccessManager"));
+const TherapistChatManager = React.lazy(() => import("./pages/Admin/TherapistChatManager"));
+
+// --- Suspense Fallback Loader ---
+const PageLoader = () => (
+  <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
+    <div className="flex flex-col items-center gap-4">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5edff4]"></div>
+      <p className="text-slate-400 text-sm font-bold animate-pulse">Loading...</p>
+    </div>
+  </div>
+);
 
 // --- Scroll Helper ---
 const ScrollToTop = () => {
@@ -102,6 +112,7 @@ const AppContent = () => {
       <ScrollToTop />
       <FloatingChatButton />
 
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* --- PUBLIC ROUTES --- */}
         <Route
@@ -236,6 +247,7 @@ const AppContent = () => {
         {/* --- 404 CATCH ALL --- */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </>
   );
 };
@@ -243,13 +255,11 @@ const AppContent = () => {
 const App = () => {
   return (
     <Router>
-      <AuthProvider>
-        <CourseProvider>
-          <EBookProvider>
-            <AppContent />
-          </EBookProvider>
-        </CourseProvider>
-      </AuthProvider>
+      <CourseProvider>
+        <EBookProvider>
+          <AppContent />
+        </EBookProvider>
+      </CourseProvider>
     </Router>
   );
 };

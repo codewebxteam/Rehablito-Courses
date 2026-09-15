@@ -68,5 +68,55 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // --- COURSE VIDEOS (Main course data collection used by Courses.jsx) ---
+    match /courseVideos/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- DASHBOARD (Per-user dashboard stats and gamification data) ---
+    match /dashboard/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- PURCHASED BOOKS (Per-user ebook purchase tracking) ---
+    match /purchasedBooks/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- PAYMENT NOTIFICATIONS (Pending payment verification requests) ---
+    match /payment_notifications/{notifId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- TRANSACTIONS (Revenue tracking, admin-only read) ---
+    match /transactions/{txnId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- STUDENTS (Admin analytics collection) ---
+    match /students/{studentId} {
+      allow read, write: if isAdmin();
+    }
+
+    // --- ENROLLMENTS (Admin analytics collection) ---
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- EBOOK FILES (Public read for ebook content) ---
+    match /ebookFiles/{fileId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

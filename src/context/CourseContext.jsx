@@ -16,6 +16,7 @@ import {
   collection,
   Timestamp,
   getDoc,
+  getDocs,
   arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
@@ -43,6 +44,15 @@ export const CourseProvider = ({ children }) => {
     }
 
     const fetchCourses = async () => {
+      // [OPTIMIZED] Batch fetch ALL courseVideos in 1 read instead of N+1 individual reads
+      const courseVideoMap = new Map();
+      try {
+        const allCoursesSnap = await getDocs(collection(db, "courseVideos"));
+        allCoursesSnap.forEach((d) => courseVideoMap.set(d.id, d.data()));
+      } catch (e) {
+        console.error("Error batch-fetching courseVideos", e);
+      }
+
       // A. Old Collection Data
       let oldWayCourses = [];
       try {
@@ -65,49 +75,43 @@ export const CourseProvider = ({ children }) => {
           (c) => typeof c !== "string",
         );
 
-        const fetchedDetails = await Promise.all(
-          courseIds.map(async (id) => {
-            try {
-              const courseDoc = await getDoc(doc(db, "courseVideos", id));
-              if (courseDoc.exists()) {
-                const data = courseDoc.data();
-                let safeLectures = [];
-                if (data.lectures && Array.isArray(data.lectures)) {
-                  safeLectures = data.lectures;
-                } else if (data.videoId) {
-                  safeLectures = [
-                    {
-                      id: Date.now(),
-                      videoId: data.videoId,
-                      title: data.title || "Main Video",
-                    },
-                  ];
-                }
-
-                return {
-                  courseId: id,
-                  id: id,
-                  title: data.title || "Untitled Course",
-                  image:
-                    data.image ||
-                    data.thumbnail ||
-                    "https://placehold.co/600x400?text=No+Image",
-                  instructor: data.instructor || "Mentor",
-                  progress: 0,
-                  status: "active",
-                  totalDuration: data.duration || "Self Paced",
-                  lectures: safeLectures,
-                  videoId: data.videoId || "",
-                  enrolledAt: new Date().toISOString(),
-                  driveLink: data.driveLink || "",
-                };
-              }
-            } catch (err) {
-              console.error(`Error fetching details for ${id}`, err);
+        // [OPTIMIZED] Use local Map lookup instead of individual getDoc() per courseId
+        const fetchedDetails = courseIds.map((id) => {
+          const data = courseVideoMap.get(id);
+          if (data) {
+            let safeLectures = [];
+            if (data.lectures && Array.isArray(data.lectures)) {
+              safeLectures = data.lectures;
+            } else if (data.videoId) {
+              safeLectures = [
+                {
+                  id: Date.now(),
+                  videoId: data.videoId,
+                  title: data.title || "Main Video",
+                },
+              ];
             }
-            return null;
-          }),
-        );
+
+            return {
+              courseId: id,
+              id: id,
+              title: data.title || "Untitled Course",
+              image:
+                data.image ||
+                data.thumbnail ||
+                "https://placehold.co/600x400?text=No+Image",
+              instructor: data.instructor || "Mentor",
+              progress: 0,
+              status: "active",
+              totalDuration: data.duration || "Self Paced",
+              lectures: safeLectures,
+              videoId: data.videoId || "",
+              enrolledAt: new Date().toISOString(),
+              driveLink: data.driveLink || "",
+            };
+          }
+          return null;
+        });
 
         const validFetched = fetchedDetails.filter((c) => c !== null);
         adminGivenCourses = [...alreadyObjects, ...validFetched];
@@ -124,31 +128,24 @@ export const CourseProvider = ({ children }) => {
       });
 
       // === [LIVE FIX FOR COMING SOON] ===
-      // Ye code user ki saved copy ko ignore karke direct Admin database se current status layega
-      const liveSyncedCourses = await Promise.all(
-        combined.map(async (course) => {
-          const cId = course.courseId || course.id;
-          if (!cId) return course;
-          try {
-            const liveDoc = await getDoc(doc(db, "courseVideos", cId));
-            if (liveDoc.exists()) {
-              const liveData = liveDoc.data();
-              return {
-                ...course,
-                // Override the local status with live status from admin
-                isComingSoon:
-                  liveData.isComingSoon === true ||
-                  liveData.status === "coming_soon" ||
-                  liveData.status === "Coming Soon",
-                driveLink: liveData.driveLink || "",
-              };
-            }
-          } catch (e) {
-            console.error("Live Sync Error", e);
-          }
-          return course;
-        }),
-      );
+      // [OPTIMIZED] Use local Map lookup instead of individual getDoc() per course
+      const liveSyncedCourses = combined.map((course) => {
+        const cId = course.courseId || course.id;
+        if (!cId) return course;
+        const liveData = courseVideoMap.get(cId);
+        if (liveData) {
+          return {
+            ...course,
+            // Override the local status with live status from admin
+            isComingSoon:
+              liveData.isComingSoon === true ||
+              liveData.status === "coming_soon" ||
+              liveData.status === "Coming Soon",
+            driveLink: liveData.driveLink || "",
+          };
+        }
+        return course;
+      });
 
       setEnrolledCourses(liveSyncedCourses);
     };

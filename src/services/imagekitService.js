@@ -7,12 +7,12 @@
  */
 
 const IMAGEKIT_UPLOAD_ENDPOINT = "https://upload.imagekit.io/api/v1/files/upload";
-const IMAGEKIT_PRIVATE_KEY =
-  import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || "private_b+6zHi1L6gBxZXbQ9Scq+VTdPG0=";
-const IMAGEKIT_PUBLIC_KEY =
-  import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || "public_WLfL24xlJbdNIpk+5F3PgakGSCM=";
+const IMAGEKIT_PRIVATE_KEY = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || "";
+const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || "";
 const IMAGEKIT_URL_ENDPOINT =
   import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/5glnyqfxu";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // Max 5MB limit
 
 /**
  * Upload a File, Blob, or base64 string directly to ImageKit CDN
@@ -29,6 +29,12 @@ export const uploadToImageKit = async (
   try {
     if (!fileTarget) {
       throw new Error("No file or blob provided for ImageKit upload");
+    }
+
+    // Strict 5MB limit check
+    const targetSize = fileTarget.size || fileTarget.blob?.size || 0;
+    if (targetSize > MAX_FILE_SIZE) {
+      throw new Error(`File size (${(targetSize / (1024 * 1024)).toFixed(1)}MB) exceeds maximum 5MB limit.`);
     }
 
     const formData = new FormData();
@@ -91,3 +97,80 @@ export const uploadToImageKit = async (
     throw error;
   }
 };
+
+/**
+ * Permanently delete a single file from ImageKit by fileId
+ * @param {string} fileId - The ImageKit file ID
+ * @returns {Promise<boolean>}
+ */
+export const deleteFromImageKit = async (fileId) => {
+  if (!fileId) return false;
+  try {
+    const authHeader = "Basic " + btoa(`${IMAGEKIT_PRIVATE_KEY}:`);
+    const response = await fetch(`https://api.imagekit.io/v1/files/${fileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: authHeader,
+      },
+    });
+    if (!response.ok && response.status !== 404) {
+      console.warn(`ImageKit delete failed for file ${fileId}: HTTP ${response.status}`);
+      return false;
+    }
+    console.log(`Successfully deleted file from ImageKit: ${fileId}`);
+    return true;
+  } catch (err) {
+    console.error(`Exception deleting file from ImageKit (${fileId}):`, err);
+    return false;
+  }
+};
+
+/**
+ * Permanently delete multiple files from ImageKit by their fileIds
+ * @param {string[]} fileIds - Array of ImageKit file IDs
+ * @returns {Promise<{ deleted: number, total: number }>}
+ */
+export const deleteMultipleFromImageKit = async (fileIds = []) => {
+  const validIds = fileIds.filter(Boolean);
+  if (!validIds.length) return { deleted: 0, total: 0 };
+
+  try {
+    // ImageKit Bulk Delete API: POST /v1/files/batch/deleteByFileIds
+    const authHeader = "Basic " + btoa(`${IMAGEKIT_PRIVATE_KEY}:`);
+    const response = await fetch("https://api.imagekit.io/v1/files/batch/deleteByFileIds", {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileIds: validIds }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`ImageKit bulk delete success:`, result);
+      return { deleted: (result.successfullyDeletedFileIds || []).length, total: validIds.length };
+    }
+
+    // Fallback: Delete individually if bulk endpoint fails
+    let deletedCount = 0;
+    await Promise.all(
+      validIds.map(async (id) => {
+        const ok = await deleteFromImageKit(id);
+        if (ok) deletedCount++;
+      })
+    );
+    return { deleted: deletedCount, total: validIds.length };
+  } catch (err) {
+    console.error("ImageKit batch delete error, falling back to individual deletion:", err);
+    let deletedCount = 0;
+    await Promise.all(
+      validIds.map(async (id) => {
+        const ok = await deleteFromImageKit(id);
+        if (ok) deletedCount++;
+      })
+    );
+    return { deleted: deletedCount, total: validIds.length };
+  }
+};
+

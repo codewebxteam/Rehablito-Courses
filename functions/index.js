@@ -69,3 +69,105 @@ exports.handlePaymentWebhook = functions.https.onRequest(async (req, res) => {
     return res.status(500).send("Server Error");
   }
 });
+
+const IMAGEKIT_PRIVATE_KEY = process.env.IMAGEKIT_PRIVATE_KEY;
+
+/**
+ * Permanently delete files from ImageKit in bulk using ImageKit API
+ */
+async function deleteFilesFromImageKit(fileIds) {
+  if (!fileIds || !fileIds.length) return 0;
+  try {
+    const authHeader = "Basic " + Buffer.from(`${IMAGEKIT_PRIVATE_KEY}:`).toString("base64");
+    const response = await fetch("https://api.imagekit.io/v1/files/batch/deleteByFileIds", {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileIds }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return (data.successfullyDeletedFileIds || []).length;
+    }
+  } catch (err) {
+    console.error("Failed to bulk delete from ImageKit in Cloud Function:", err);
+  }
+  return 0;
+}
+
+/**
+ * Core cleanup logic: Permanently deletes consultation messages and attachments
+ * older than 7 days from both Firestore and ImageKit CDN
+ */
+async function purgeExpiredConsultationChats(retentionDays = 7) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  console.log(`[CloudCleanup] Purging consultation messages before ${cutoff.toISOString()}`);
+
+  const threadsSnap = await db.collection("consultation_threads").get();
+  let deletedMsgCount = 0;
+  const fileIds = [];
+
+  for (const threadDoc of threadsSnap.docs) {
+    const messagesRef = threadDoc.ref.collection("messages");
+    const expiredSnap = await messagesRef.where("createdAt", "<=", cutoff).get();
+
+    if (!expiredSnap.empty) {
+      const batch = db.batch();
+      expiredSnap.forEach((doc) => {
+        const data = doc.data();
+        if (Array.isArray(data.attachments)) {
+          data.attachments.forEach((att) => {
+            if (att.fileId) fileIds.push(att.fileId);
+          });
+        }
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      deletedMsgCount += expiredSnap.size;
+
+      // Update thread lastMessage if all messages expired
+      const remainingSnap = await messagesRef.limit(1).get();
+      if (remainingSnap.empty) {
+        await threadDoc.ref.update({
+          lastMessage: "Messages older than 7 days were automatically cleared.",
+          status: "pending",
+          unreadAdminCount: 0,
+          unreadUserCount: 0,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+  }
+
+  let deletedFileCount = 0;
+  if (fileIds.length > 0) {
+    deletedFileCount = await deleteFilesFromImageKit(fileIds);
+  }
+
+  console.log(`[CloudCleanup] Purged ${deletedMsgCount} messages and ${deletedFileCount} files from ImageKit.`);
+  return { deletedMessages: deletedMsgCount, deletedFiles: deletedFileCount };
+}
+
+/**
+ * Scheduled Daily Cron Job (Runs automatically every 24 hours)
+ */
+exports.scheduledDailyChatCleanup = functions.pubsub
+  .schedule("every 24 hours")
+  .timeZone("Asia/Kolkata")
+  .onRun(async () => {
+    return purgeExpiredConsultationChats(7);
+  });
+
+/**
+ * On-demand HTTP endpoint to trigger cleanup manually
+ */
+exports.manualChatCleanup = functions.https.onRequest(async (req, res) => {
+  try {
+    const result = await purgeExpiredConsultationChats(7);
+    return res.status(200).json({ success: true, result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});

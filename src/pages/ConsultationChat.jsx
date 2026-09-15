@@ -35,6 +35,7 @@ import {
   getCachedConsultationData,
   setCachedConsultationData,
   clearConsultationCache,
+  autoCleanupExpiredConsultations,
 } from "../services/consultationService";
 import FormattedMessageText from "../components/chat/FormattedMessageText";
 
@@ -154,6 +155,7 @@ const ConsultationChat = ({ isDashboard = false }) => {
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const isSendingRef = useRef(false);
 
   const aiScrollContainerRef = useRef(null);
   const therapistScrollContainerRef = useRef(null);
@@ -243,6 +245,15 @@ const ConsultationChat = ({ isDashboard = false }) => {
             }, 50);
           });
         }
+        // Auto-cleanup consultation chats older than 7 days (runs once daily in background)
+        const lastCleanup = localStorage.getItem("last_consultation_cleanup_timestamp");
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        if (!lastCleanup || Date.now() - Number(lastCleanup) > oneDayMs) {
+          localStorage.setItem("last_consultation_cleanup_timestamp", String(Date.now()));
+          autoCleanupExpiredConsultations(7).catch((err) =>
+            console.warn("[Cleanup] Auto-cleanup background notice:", err)
+          );
+        }
       } catch (err) {
         console.error("Failed to initialize consultation thread:", err);
       } finally {
@@ -265,11 +276,28 @@ const ConsultationChat = ({ isDashboard = false }) => {
     // 2. Add local optimistic items if not already stored in Firestore
     const combined = [...firestoreItems];
     localAiQueue.forEach((local) => {
-      const exists = combined.some(
-        (m) =>
-          (local.id && m.id === local.id) ||
-          (local.text && m.text === local.text && m.sender === local.sender)
-      );
+      const exists = combined.some((m) => {
+        if (local.id && m.id === local.id) return true;
+        // Compare text if both have text
+        if (
+          local.text &&
+          m.text &&
+          local.text.trim() === m.text.trim() &&
+          m.sender === local.sender
+        ) {
+          return true;
+        }
+        // Compare attachments if text is empty or matches
+        if (
+          m.sender === local.sender &&
+          local.attachments?.length &&
+          m.attachments?.length &&
+          local.attachments[0]?.name === m.attachments[0]?.name
+        ) {
+          return true;
+        }
+        return false;
+      });
       if (!exists) {
         combined.push(local);
       }
@@ -467,8 +495,8 @@ const ConsultationChat = ({ isDashboard = false }) => {
         return;
       }
 
-      if (file.size > 20 * 1024 * 1024) {
-        alert("File size exceeds 20MB limit.");
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File size exceeds 5MB limit. Please upload an image or document under 5MB.");
         return;
       }
 
@@ -547,9 +575,12 @@ const ConsultationChat = ({ isDashboard = false }) => {
 
   // 9. Send Consultation Message (Multimodal -> AI + Therapist Queue)
   const handleSendMessage = async () => {
+    if (isSendingRef.current || sending) return;
+
     const trimmed = inputText.trim();
     if (!trimmed && attachments.length === 0) return;
 
+    isSendingRef.current = true;
     setSending(true);
     const activeAttachments = [...attachments];
     setInputText("");
@@ -592,6 +623,7 @@ const ConsultationChat = ({ isDashboard = false }) => {
             threadId: thread.id,
             text: aiResult.text,
           });
+          setLocalAiQueue((prev) => prev.filter((item) => item.id !== aiReplyItem.id));
         }
       })
       .catch((err) => {
@@ -605,18 +637,19 @@ const ConsultationChat = ({ isDashboard = false }) => {
     try {
       const uploadedAttachments = await Promise.all(
         activeAttachments.map(async (att) => {
-          let url = "";
+          let uploadRes = { url: "", fileId: null };
           if (att.blob) {
-            url = await uploadAttachmentFile(att.blob, currentUser.uid);
+            uploadRes = await uploadAttachmentFile(att.blob, currentUser.uid);
           } else if (att.url) {
-            url = att.url;
+            uploadRes = { url: att.url, fileId: att.fileId || null };
           }
-          // NEVER save huge base64 dataUrl (2-5MB) to Firestore!
-          // Only save clean ImageKit CDN URLs to prevent Firestore 1MB crash.
+          const finalUrl = typeof uploadRes === "string" ? uploadRes : (uploadRes?.url || "");
+          const finalFileId = typeof uploadRes === "object" ? (uploadRes?.fileId || null) : null;
           return {
             type: att.type,
             name: att.name,
-            url: url || "",
+            url: finalUrl,
+            fileId: finalFileId,
             duration: att.duration || null,
           };
         })
@@ -629,10 +662,12 @@ const ConsultationChat = ({ isDashboard = false }) => {
           text: trimmed,
           attachments: uploadedAttachments,
         });
+        setLocalAiQueue((prev) => prev.filter((item) => item.id !== tempId));
       }
     } catch (err) {
       console.error("Failed to send message to therapist queue:", err);
     } finally {
+      isSendingRef.current = false;
       setSending(false);
     }
   };
@@ -837,7 +872,7 @@ const ConsultationChat = ({ isDashboard = false }) => {
                       <Sparkles className="w-3 h-3 text-[#E6007E]" />
                     </h2>
                     <p className="text-[10px] text-slate-500">
-                      Instant Clinical Guidance (Gemini)
+                      Instant Clinical Guidance
                     </p>
                   </div>
                 </div>

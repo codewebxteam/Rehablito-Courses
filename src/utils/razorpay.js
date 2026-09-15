@@ -1,6 +1,7 @@
 import { createOrder } from "../firebase/orders.service";
 
 export const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 
 // Dynamically load Razorpay SDK if not present
 export const loadRazorpayScript = () => {
@@ -54,17 +55,56 @@ export const initiateRazorpayPayment = async ({
       image: "https://ik.imagekit.io/5glnyqfxu/Courses/LogoRehab.webp",
       handler: async function (response) {
         try {
-          await createOrder({
-            studentName: currentUser?.displayName || currentUser?.email || "Student",
-            studentEmail: currentUser?.email || "",
-            userId: currentUser?.uid || null,
-            assetName: item.title || "Untitled Course",
-            type: type,
-            saleValue: numericPrice,
-            courseId: type === "course" ? (item.id || item.courseId) : null,
-            ebookId: type === "ebook" ? (item.id || item.ebookId) : null,
-            razorpayPaymentId: response.razorpay_payment_id,
-          });
+          if (BACKEND_URL) {
+            // Verify via Railway Backend with secret key
+            try {
+              const verifyRes = await fetch(`${BACKEND_URL}/api/payment/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id || null,
+                  razorpay_signature: response.razorpay_signature || null,
+                  studentName: currentUser?.displayName || currentUser?.email || "Student",
+                  userEmail: currentUser?.email || "",
+                  userId: currentUser?.uid || null,
+                  assetName: item.title || "Untitled Course",
+                  type: type,
+                  saleValue: numericPrice,
+                  courseId: type === "course" ? (item.id || item.courseId) : null,
+                  ebookId: type === "ebook" ? (item.id || item.ebookId) : null,
+                }),
+              });
+              const verifyData = await verifyRes.json();
+              console.log("[Razorpay] Server verification response:", verifyData);
+            } catch (backendErr) {
+              console.warn("[Razorpay] Backend verification unreachable, using Firestore fallback:", backendErr);
+              await createOrder({
+                studentName: currentUser?.displayName || currentUser?.email || "Student",
+                studentEmail: currentUser?.email || "",
+                userId: currentUser?.uid || null,
+                assetName: item.title || "Untitled Course",
+                type: type,
+                saleValue: numericPrice,
+                courseId: type === "course" ? (item.id || item.courseId) : null,
+                ebookId: type === "ebook" ? (item.id || item.ebookId) : null,
+                razorpayPaymentId: response.razorpay_payment_id,
+              });
+            }
+          } else {
+            // Direct Firestore order record
+            await createOrder({
+              studentName: currentUser?.displayName || currentUser?.email || "Student",
+              studentEmail: currentUser?.email || "",
+              userId: currentUser?.uid || null,
+              assetName: item.title || "Untitled Course",
+              type: type,
+              saleValue: numericPrice,
+              courseId: type === "course" ? (item.id || item.courseId) : null,
+              ebookId: type === "ebook" ? (item.id || item.ebookId) : null,
+              razorpayPaymentId: response.razorpay_payment_id,
+            });
+          }
 
           if (onSuccess) {
             await onSuccess(response);

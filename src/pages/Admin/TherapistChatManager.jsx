@@ -40,6 +40,7 @@ import {
   fetchUserCoursePurchaseStatus,
   markThreadAsSeenByAdmin,
   uploadAttachmentFile,
+  autoCleanupExpiredConsultations,
 } from "../../services/consultationService";
 import { useAuth } from "../../context/AuthContext";
 import { getDateStringForDivider } from "../ConsultationChat";
@@ -93,6 +94,7 @@ const TherapistChatManager = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const isSendingRef = useRef(false);
 
   // File Upload (Images & PDFs)
   const handleFileUpload = (e) => {
@@ -113,8 +115,8 @@ const TherapistChatManager = () => {
         return;
       }
 
-      if (file.size > 20 * 1024 * 1024) {
-        alert("File size exceeds 20MB limit.");
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File size exceeds 5MB limit. Please upload an image or document under 5MB.");
         return;
       }
 
@@ -337,9 +339,12 @@ const TherapistChatManager = () => {
 
   // Handle Send Reply with text and multimedia attachments
   const handleSendReply = async (textToSend = replyText) => {
+    if (isSendingRef.current || sending) return;
+
     const text = typeof textToSend === "string" ? textToSend.trim() : replyText.trim();
     if ((!text && attachments.length === 0) || !selectedThread?.id) return;
 
+    isSendingRef.current = true;
     setSending(true);
     const activeAttachments = [...attachments];
     setReplyText("");
@@ -350,18 +355,19 @@ const TherapistChatManager = () => {
       // 1. Upload files/blobs to ImageKit CDN
       const uploadedAttachments = await Promise.all(
         activeAttachments.map(async (att) => {
-          let url = "";
+          let uploadRes = { url: "", fileId: null };
           if (att.blob) {
-            url = await uploadAttachmentFile(att.blob, "therapist_admin");
+            uploadRes = await uploadAttachmentFile(att.blob, "therapist_admin");
           } else if (att.url) {
-            url = att.url;
+            uploadRes = { url: att.url, fileId: att.fileId || null };
           }
-          // NEVER save huge base64 dataUrl (2-5MB) to Firestore!
-          // Only save clean ImageKit CDN URLs to prevent Firestore 1MB crash.
+          const finalUrl = typeof uploadRes === "string" ? uploadRes : (uploadRes?.url || "");
+          const finalFileId = typeof uploadRes === "object" ? (uploadRes?.fileId || null) : null;
           return {
             type: att.type,
             name: att.name,
-            url: url || "",
+            url: finalUrl,
+            fileId: finalFileId,
             duration: att.duration || null,
           };
         })
@@ -388,6 +394,7 @@ const TherapistChatManager = () => {
       console.error("Failed to send therapist reply:", err);
       alert("Failed to send reply. Please check your connection.");
     } finally {
+      isSendingRef.current = false;
       setSending(false);
     }
   };
