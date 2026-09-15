@@ -121,14 +121,10 @@ const AuthModal = ({ isOpen, onClose, defaultMode = "login" }) => {
     try {
       if (mode === "login") {
         await login(formData.email, formData.password);
+        localStorage.removeItem("pendingCheckoutCourse");
+        localStorage.removeItem("pendingCheckoutBook");
         onClose();
-        const pendingCourseJSON = localStorage.getItem("pendingCheckoutCourse");
-        if (pendingCourseJSON) {
-          const pendingCourse = JSON.parse(pendingCourseJSON);
-          window.location.href = pendingCourse.paymentLink;
-        } else {
-          navigate("/dashboard");
-        }
+        navigate("/dashboard");
       } else if (mode === "signup") {
         await signup(
           formData.email,
@@ -137,20 +133,13 @@ const AuthModal = ({ isOpen, onClose, defaultMode = "login" }) => {
           formData.phone
         );
 
+        localStorage.removeItem("pendingCheckoutCourse");
+        localStorage.removeItem("pendingCheckoutBook");
         setSyncing(true);
         setLoading(false);
 
         setTimeout(() => {
-          const pendingCourseJSON = localStorage.getItem(
-            "pendingCheckoutCourse"
-          );
-
-          if (pendingCourseJSON) {
-            const pendingCourse = JSON.parse(pendingCourseJSON);
-            window.location.href = pendingCourse.paymentLink;
-          } else {
-            navigate("/dashboard");
-          }
+          navigate("/dashboard");
           onClose();
           setSyncing(false);
         }, 1500);

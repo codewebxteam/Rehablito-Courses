@@ -114,15 +114,6 @@ const Courses = () => {
     return tabs;
   }, [courses]);
 
-  const processPayment = (course) => {
-    const paymentUrl = course.paymentLink;
-    if (paymentUrl) {
-      window.location.href = paymentUrl;
-    } else {
-      alert("Payment link is not configured for this course. Please contact support.");
-    }
-  };
-
   const handlePlayVideo = (courseId) => {
     const enrolledCourse = getEnrolledCourse(courseId);
     if (enrolledCourse) {
