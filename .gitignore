@@ -15,6 +15,9 @@ dist-ssr
 .env.*
 .env.example
 seedUsers.js
+serviceAccountKey.json
+*firebase-adminsdk*.json
+service-account*.json
 
 
 # Editor directories and files

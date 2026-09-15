@@ -12,6 +12,8 @@
  */
 
 require("dotenv").config();
+const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -21,6 +23,7 @@ const admin = require("firebase-admin");
 
 // 1. Initialize Firebase Admin SDK
 try {
+  const localKeyPath = path.join(__dirname, "serviceAccountKey.json");
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     let saRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (typeof saRaw === "string") {
@@ -36,7 +39,13 @@ try {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
-    console.log("Firebase Admin initialized with Service Account Credentials.");
+    console.log("Firebase Admin initialized with Service Account Credentials from environment.");
+  } else if (fs.existsSync(localKeyPath)) {
+    const serviceAccount = require(localKeyPath);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("Firebase Admin initialized with local serviceAccountKey.json.");
   } else {
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID || "rehablito-courses",
