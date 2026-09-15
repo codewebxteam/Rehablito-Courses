@@ -22,9 +22,17 @@ const admin = require("firebase-admin");
 // 1. Initialize Firebase Admin SDK
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === "string"
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-      : process.env.FIREBASE_SERVICE_ACCOUNT;
+    let saRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (typeof saRaw === "string") {
+      saRaw = saRaw.trim();
+      if ((saRaw.startsWith("'") && saRaw.endsWith("'")) || (saRaw.startsWith('"') && saRaw.endsWith('"') && !saRaw.endsWith('"}'))) {
+        saRaw = saRaw.slice(1, -1);
+      }
+    }
+    let serviceAccount = typeof saRaw === "string" ? JSON.parse(saRaw) : saRaw;
+    if (serviceAccount && serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
@@ -36,9 +44,13 @@ try {
     console.log(`Firebase Admin initialized with Project ID: ${process.env.FIREBASE_PROJECT_ID || "rehablito-courses"}`);
   }
 } catch (err) {
-  console.warn("Firebase Admin init warning (using default credentials):", err.message);
+  console.error("Firebase Admin initialization error:", err.message);
   if (!admin.apps.length) {
-    admin.initializeApp();
+    try {
+      admin.initializeApp();
+    } catch (e) {
+      console.error("Fallback initialization error:", e.message);
+    }
   }
 }
 
