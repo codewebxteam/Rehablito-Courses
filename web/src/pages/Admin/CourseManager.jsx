@@ -150,7 +150,7 @@ const CourseManager = () => {
 
     setFormData({
       title: course.title || "",
-      category: isPreset ? courseCategory : "Custom",
+      category: isPreset ? courseCategory : "Other",
       customCategory: isPreset ? "" : courseCategory,
       description: course.description || "",
       syllabus: course.syllabus || "",
@@ -230,13 +230,27 @@ const CourseManager = () => {
 
     setLoading(true);
     try {
+      const EXISTING_COURSE_IMAGES = [
+        "https://ik.imagekit.io/5glnyqfxu/Courses/AutismCard1.webp",
+        "https://ik.imagekit.io/5glnyqfxu/Courses/SpeechCard2.webp",
+        "https://ik.imagekit.io/5glnyqfxu/Courses/OccuptaitonalCard3.webp",
+        "https://ik.imagekit.io/5glnyqfxu/Courses/BehaviourCard4.webp",
+        "https://ik.imagekit.io/5glnyqfxu/Courses/SpecialEducationCard5.webp",
+        "https://ik.imagekit.io/5glnyqfxu/Courses/RehabCard6.webp",
+      ];
+
       const firstVid = formData.lectures[0];
-      const thumbUrl = `https://img.youtube.com/vi/${firstVid.videoId}/maxresdefault.jpg`;
+      const randomCourseImage =
+        EXISTING_COURSE_IMAGES[Math.floor(Math.random() * EXISTING_COURSE_IMAGES.length)];
+      const thumbUrl = firstVid?.videoId
+        ? `https://img.youtube.com/vi/${firstVid.videoId}/maxresdefault.jpg`
+        : randomCourseImage;
       const introId = extractVideoId(formData.introVideoUrl);
-      const finalCategory =
-        formData.category === "Custom"
-          ? formData.customCategory || "General"
-          : formData.category;
+      const isOtherOrCustom =
+        formData.category === "Custom" || formData.category === "Other";
+      const finalCategory = isOtherOrCustom
+        ? formData.customCategory?.trim() || "Other"
+        : formData.category;
 
       const courseData = {
         title: formData.title,
@@ -245,8 +259,8 @@ const CourseManager = () => {
         syllabus: formData.syllabus,
         lectures: formData.lectures,
         demoVideos: formData.demoVideos, // [NEW] Save Demos
-        url: firstVid.url,
-        videoId: firstVid.videoId,
+        url: firstVid?.url || "",
+        videoId: firstVid?.videoId || "",
         driveLink: formData.driveLink,
         price: formData.price.toString(),
         originalPrice: formData.discountPrice.toString(),
@@ -254,7 +268,7 @@ const CourseManager = () => {
         mainVideoId: introId,
         isComingSoon: formData.isComingSoon, // Save coming soon status
         updatedAt: new Date().toISOString(),
-        image: thumbUrl,
+        image: thumbUrl || randomCourseImage,
         instructor: "Admin",
         rating: 4.8,
         lecturesCount: `${formData.lectures.length} Lectures`,
@@ -590,18 +604,18 @@ const CourseManager = () => {
                               <option value="Behaviour Therapy">Behaviour Therapy</option>
                               <option value="Special Education">Special Education</option>
                               <option value="Pediatric Rehabilitation">Pediatric Rehabilitation</option>
-                              <option value="Custom">Custom Category (Type below)...</option>
+                              <option value="Other">Other (Custom Category - Type below)...</option>
                             </select>
                           </div>
 
-                          {formData.category === "Custom" && (
+                          {(formData.category === "Custom" || formData.category === "Other") && (
                             <div>
                               <label className="text-xs font-bold text-indigo-600 uppercase mb-1 block">
-                                Custom Category Name *
+                                Enter Category Name *
                               </label>
                               <input
                                 type="text"
-                                placeholder="e.g. Music Therapy"
+                                placeholder="e.g. Music Therapy, Sensory Integration"
                                 className="w-full bg-indigo-50 p-3 rounded-xl border border-indigo-200 focus:border-indigo-500 outline-none font-bold text-indigo-900"
                                 value={formData.customCategory}
                                 onChange={(e) =>

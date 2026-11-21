@@ -582,7 +582,6 @@ export const clearConsultationMessages = async (threadId) => {
 
     // 2. Permanently delete media from ImageKit
     if (fileIdsToDelete.length > 0) {
-      console.log(`[ClearChat] Permanently deleting ${fileIdsToDelete.length} files from ImageKit...`);
       await deleteMultipleFromImageKit(fileIdsToDelete);
     }
 
@@ -622,7 +621,6 @@ export const autoCleanupExpiredConsultations = async (retentionDays = 7) => {
   try {
     const now = Date.now();
     const cutoffDate = new Date(now - retentionDays * 24 * 60 * 60 * 1000);
-    console.log(`[AutoCleanup] Checking for consultation messages older than ${retentionDays} days (before ${cutoffDate.toISOString()})...`);
 
     const threadsSnap = await getDocs(collection(db, THREADS_COLLECTION));
     let totalDeletedMessages = 0;
@@ -639,7 +637,6 @@ export const autoCleanupExpiredConsultations = async (retentionDays = 7) => {
       const expiredSnap = await getDocs(expiredQuery);
 
       if (!expiredSnap.empty) {
-        console.log(`[AutoCleanup] Thread ${threadId} has ${expiredSnap.size} expired messages.`);
         const deleteDocPromises = [];
 
         expiredSnap.forEach((msgDoc) => {
@@ -674,15 +671,12 @@ export const autoCleanupExpiredConsultations = async (retentionDays = 7) => {
     // Permanently delete from ImageKit
     let deletedFiles = 0;
     if (allFileIdsToDelete.length > 0) {
-      console.log(`[AutoCleanup] Permanently deleting ${allFileIdsToDelete.length} expired files from ImageKit...`);
       const res = await deleteMultipleFromImageKit(allFileIdsToDelete);
       deletedFiles = res.deleted;
     }
 
-    console.log(`[AutoCleanup] Completed: ${totalDeletedMessages} messages and ${deletedFiles} ImageKit files purged.`);
     return { deletedMessages: totalDeletedMessages, deletedFiles };
   } catch (err) {
-    console.error("[AutoCleanup] Error running consultation auto-cleanup:", err);
     return { deletedMessages: 0, deletedFiles: 0, error: err.message };
   }
 };

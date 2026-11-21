@@ -504,13 +504,32 @@ const Courses = () => {
   );
 };
 
+const EXISTING_COURSE_IMAGES = [
+  "https://ik.imagekit.io/5glnyqfxu/Courses/AutismCard1.webp",
+  "https://ik.imagekit.io/5glnyqfxu/Courses/SpeechCard2.webp",
+  "https://ik.imagekit.io/5glnyqfxu/Courses/OccuptaitonalCard3.webp",
+  "https://ik.imagekit.io/5glnyqfxu/Courses/BehaviourCard4.webp",
+  "https://ik.imagekit.io/5glnyqfxu/Courses/SpecialEducationCard5.webp",
+  "https://ik.imagekit.io/5glnyqfxu/Courses/RehabCard6.webp",
+];
+
 // --- COURSE CARD COMPONENT FOR REAL DATA ---
 const CourseCard = ({ course, isEnrolled, onBuy, onPlay }) => {
+  const getDeterministicImage = (idOrTitle) => {
+    const str = String(idOrTitle || "rehablito");
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash + str.charCodeAt(i)) % EXISTING_COURSE_IMAGES.length;
+    }
+    return EXISTING_COURSE_IMAGES[hash];
+  };
+
   const imageUrl =
-    course.image ||
-    (course.videoId
-      ? `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
-      : "https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=600&auto=format&fit=crop&q=80");
+    (course.image && !course.image.includes("unsplash.com"))
+      ? course.image
+      : (course.videoId
+        ? `https://img.youtube.com/vi/${course.videoId}/maxresdefault.jpg`
+        : getDeterministicImage(course.id || course.title));
 
   const rating = course.rating || 4.8;
   const reviews = course.reviews || 120;

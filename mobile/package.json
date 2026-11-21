@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "@expo-google-fonts/rubik": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.19.0",
     "@react-navigation/native": "^7.4.0",
     "@react-navigation/native-stack": "^7.19.0",
     "expo": "~57.0.22",
+    "expo-document-picker": "~57.0.2",
+    "expo-font": "^57.0.4",
+    "expo-image-picker": "~57.0.19",
     "expo-status-bar": "~57.0.1",
     "firebase": "^12.19.0",
     "nativewind": "^4.2.7",
@@ -16,9 +20,11 @@
     "react-native": "0.86.3",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "react-native-webview": "13.16.1"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-nav.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -26,6 +32,7 @@
   },
   "private": true,
   "devDependencies": {
+    "babel-preset-expo": "^57.0.11",
     "tailwindcss": "^3.4.19"
   }
 }

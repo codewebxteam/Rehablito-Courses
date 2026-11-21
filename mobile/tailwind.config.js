@@ -20,6 +20,15 @@ module.exports = {
           900: "#0f172a",
           950: "#020617",
         }
+      },
+      fontFamily: {
+        sans: ['Rubik_400Regular'],
+        rubik: ['Rubik_400Regular'],
+        'rubik-medium': ['Rubik_500Medium'],
+        'rubik-semibold': ['Rubik_600SemiBold'],
+        'rubik-bold': ['Rubik_700Bold'],
+        'rubik-extrabold': ['Rubik_800ExtraBold'],
+        'rubik-black': ['Rubik_900Black'],
       }
     },
   },

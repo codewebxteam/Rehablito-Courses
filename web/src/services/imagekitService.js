@@ -4,10 +4,20 @@
  * - Patient Doctor Parchi (Prescription photos)
  * - Clinical PDF reports & assessment documents
  * - Audio Voice Guidance & Voice Notes
+ *
+ * NOTE: Private keys are NEVER used in frontend code.
+ * Uploads use backend-generated authentication signatures (token, expire, signature).
+ * File deletions are routed through the secure backend server (/api/media/delete-imagekit).
  */
 
+import { BACKEND_URL as RAZORPAY_BACKEND_URL } from "../utils/razorpay";
+
+const BACKEND_URL =
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_BACKEND_URL) ||
+  RAZORPAY_BACKEND_URL ||
+  "https://rehablito-courses-production.up.railway.app";
+
 const IMAGEKIT_UPLOAD_ENDPOINT = "https://upload.imagekit.io/api/v1/files/upload";
-const IMAGEKIT_PRIVATE_KEY = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || "";
 const IMAGEKIT_PUBLIC_KEY = import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || "";
 const IMAGEKIT_URL_ENDPOINT =
   import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/5glnyqfxu";
@@ -15,7 +25,22 @@ const IMAGEKIT_URL_ENDPOINT =
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // Max 5MB limit
 
 /**
- * Upload a File, Blob, or base64 string directly to ImageKit CDN
+ * Fetch client upload authentication parameters from backend
+ */
+async function getImageKitAuthParams() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/media/imagekit-auth`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch ImageKit auth: HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Upload a File, Blob, or base64 string directly to ImageKit CDN securely
  * @param {File|Blob|string} fileTarget - The file, blob, or base64 string
  * @param {string} fileName - The desired or original filename
  * @param {string} folder - ImageKit folder destination (e.g., "/consultations")
@@ -52,7 +77,6 @@ export const uploadToImageKit = async (
 
     // Determine payload format
     if (typeof fileTarget === "string" && fileTarget.startsWith("data:")) {
-      // Base64 dataUrl string
       formData.append("file", fileTarget);
     } else if (fileTarget instanceof File || fileTarget instanceof Blob) {
       formData.append("file", fileTarget, cleanName);
@@ -66,14 +90,17 @@ export const uploadToImageKit = async (
     formData.append("folder", folder.startsWith("/") ? folder : `/${folder}`);
     formData.append("useUniqueFileName", "true");
 
-    // Standard ImageKit Basic Auth header using Private Key
-    const authHeader = "Basic " + btoa(`${IMAGEKIT_PRIVATE_KEY}:`);
+    // Secure ImageKit Client-Side Auth parameters from Backend
+    const authParams = await getImageKitAuthParams();
+    if (authParams && authParams.signature) {
+      formData.append("publicKey", IMAGEKIT_PUBLIC_KEY);
+      formData.append("signature", authParams.signature);
+      formData.append("expire", authParams.expire);
+      formData.append("token", authParams.token);
+    }
 
     const response = await fetch(IMAGEKIT_UPLOAD_ENDPOINT, {
       method: "POST",
-      headers: {
-        Authorization: authHeader,
-      },
       body: formData,
     });
 
@@ -93,40 +120,33 @@ export const uploadToImageKit = async (
       thumbnailUrl: data.thumbnailUrl || data.url,
     };
   } catch (error) {
-    console.error("ImageKit upload exception:", error);
     throw error;
   }
 };
 
 /**
- * Permanently delete a single file from ImageKit by fileId
+ * Permanently delete a single file from ImageKit via secure backend proxy
  * @param {string} fileId - The ImageKit file ID
  * @returns {Promise<boolean>}
  */
 export const deleteFromImageKit = async (fileId) => {
   if (!fileId) return false;
   try {
-    const authHeader = "Basic " + btoa(`${IMAGEKIT_PRIVATE_KEY}:`);
-    const response = await fetch(`https://api.imagekit.io/v1/files/${fileId}`, {
-      method: "DELETE",
+    const response = await fetch(`${BACKEND_URL}/api/media/delete-imagekit`, {
+      method: "POST",
       headers: {
-        Authorization: authHeader,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({ fileId }),
     });
-    if (!response.ok && response.status !== 404) {
-      console.warn(`ImageKit delete failed for file ${fileId}: HTTP ${response.status}`);
-      return false;
-    }
-    console.log(`Successfully deleted file from ImageKit: ${fileId}`);
-    return true;
+    return response.ok;
   } catch (err) {
-    console.error(`Exception deleting file from ImageKit (${fileId}):`, err);
     return false;
   }
 };
 
 /**
- * Permanently delete multiple files from ImageKit by their fileIds
+ * Permanently delete multiple files from ImageKit via secure backend proxy
  * @param {string[]} fileIds - Array of ImageKit file IDs
  * @returns {Promise<{ deleted: number, total: number }>}
  */
@@ -135,12 +155,9 @@ export const deleteMultipleFromImageKit = async (fileIds = []) => {
   if (!validIds.length) return { deleted: 0, total: 0 };
 
   try {
-    // ImageKit Bulk Delete API: POST /v1/files/batch/deleteByFileIds
-    const authHeader = "Basic " + btoa(`${IMAGEKIT_PRIVATE_KEY}:`);
-    const response = await fetch("https://api.imagekit.io/v1/files/batch/deleteByFileIds", {
+    const response = await fetch(`${BACKEND_URL}/api/media/delete-imagekit`, {
       method: "POST",
       headers: {
-        Authorization: authHeader,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ fileIds: validIds }),
@@ -148,29 +165,12 @@ export const deleteMultipleFromImageKit = async (fileIds = []) => {
 
     if (response.ok) {
       const result = await response.json();
-      console.log(`ImageKit bulk delete success:`, result);
-      return { deleted: (result.successfullyDeletedFileIds || []).length, total: validIds.length };
+      return { deleted: result.deletedCount || validIds.length, total: validIds.length };
     }
-
-    // Fallback: Delete individually if bulk endpoint fails
-    let deletedCount = 0;
-    await Promise.all(
-      validIds.map(async (id) => {
-        const ok = await deleteFromImageKit(id);
-        if (ok) deletedCount++;
-      })
-    );
-    return { deleted: deletedCount, total: validIds.length };
+    return { deleted: 0, total: validIds.length };
   } catch (err) {
-    console.error("ImageKit batch delete error, falling back to individual deletion:", err);
-    let deletedCount = 0;
-    await Promise.all(
-      validIds.map(async (id) => {
-        const ok = await deleteFromImageKit(id);
-        if (ok) deletedCount++;
-      })
-    );
-    return { deleted: deletedCount, total: validIds.length };
+    return { deleted: 0, total: validIds.length };
   }
 };
+
 
